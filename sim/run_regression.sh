@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd -- "$(dirname -- "$0")"
+
+STAMP=$(date +%Y%m%d_%H%M%S)
+COV_DIR=${COV_DIR:-regression_${STAMP}.vdb}
+REPORT_DIR=${REPORT_DIR:-urgReport_${STAMP}}
+BASE_SEED=${BASE_SEED:-1000}
+
+TESTS=(
+    dma_random_smoke_test
+    dma_ral_smoke_test
+    dma_wstrb_test
+    dma_boundary_matrix_test
+    dma_irq_mode_test
+    dma_invalid_desc_test
+    dma_length_sweep_test
+    dma_queue_saturation_test
+    dma_pop_empty_test
+    dma_sub_beat_tag_test
+    dma_alignment_reject_test
+    dma_access_policy_test
+    dma_read_slverr_test
+    dma_read_decerr_test
+    dma_write_slverr_test
+    dma_write_decerr_test
+    dma_queue_mid_level_test
+    dma_empty_completion_read_test
+    dma_axi_backpressure_test
+    dma_toggle_stress_test
+    dma_command_noop_test
+    dma_address_range_reject_test
+    dma_ro_write_protection_test
+    dma_overlap_reject_test
+    dma_reset_recovery_test
+    dma_outstanding_test
+    dma_write_engine_corner_test
+    dma_sva_activation_test
+)
+
+mkdir -p regression_logs
+
+vcs -full64 -sverilog -ntb_opts uvm-1.2 \
+    -timescale=1ns/1ps \
+    -f run_uvm.f -top tb_uvm_top \
+    -debug_access+all -kdb \
+    -cm_hier cm_hier_final.cfg \
+    -cm_assert_hier cm_assert_hier.cfg \
+    -cm line+cond+tgl+fsm+branch+assert -cm_noconst -cm_dir "$COV_DIR" \
+    -o simv
+
+index=0
+for test_name in "${TESTS[@]}"; do
+    seed=$((BASE_SEED + index))
+    ./simv \
+        +UVM_TESTNAME="$test_name" \
+        +ntb_random_seed="$seed" \
+        -cm line+cond+tgl+fsm+branch+assert \
+        -cm_dir "$COV_DIR" \
+        -cm_name "$test_name" \
+        | tee "regression_logs/${test_name}.log"
+    index=$((index + 1))
+done
+
+COND_EL=${COND_EL:-exclusions/final_cond.el}
+if [[ -s "$COND_EL" ]]; then
+    urg -dir "$COV_DIR" -elfile "$COND_EL" -excl_strict -report "$REPORT_DIR"
+else
+    urg -dir "$COV_DIR" -report "$REPORT_DIR"
+    echo "COND exclusions not loaded: $COND_EL is absent"
+fi
+
+echo "Coverage database: $COV_DIR"
+echo "URG report:        $REPORT_DIR"
