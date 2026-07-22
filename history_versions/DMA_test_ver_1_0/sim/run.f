@@ -1,0 +1,12 @@
+../rtl/vendor/verilog_axi/axi_dma_rd.v
+../rtl/vendor/verilog_axi/axi_dma_wr.v
+../rtl/vendor/verilog_axi/axi_dma.v
+../rtl/vendor/verilog_axi/axil_reg_if_rd.v
+../rtl/vendor/verilog_axi/axil_reg_if_wr.v
+../rtl/vendor/verilog_axi/axil_reg_if.v
+../rtl/desc_fifo.v
+../rtl/axis_fifo.v
+../rtl/dma_desc_manager.v
+../rtl/axi_dma_subsystem.v
+../tb/models/axi_ram.v
+../tb/tb_axi_dma_multi_desc_smoke.sv
