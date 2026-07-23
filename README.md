@@ -29,7 +29,7 @@ The verification platform includes an active AXI-Lite agent, UVM RAL, a controll
 
 # System Architecture
 
-<img src="docs/images/dma_subsystem_architecture.png" width="650px" >
+<img src="docs/images/dma_subsystem_architecture.svg" width="650px" >
 
 The subsystem exposes one AXI4 master interface. Source and destination addresses refer to regions in the same external memory address space; the testbench connects that interface to a single 64 KiB AXI RAM through a verification-only proxy.
 
@@ -131,7 +131,7 @@ All registers are 32 bits wide.
 
 # Verification Architecture
 
-<img src="docs/images/uvm_environment_topology.png" width="750px" >
+<img src="docs/images/uvm_environment_topology.svg" width="750px" >
 
 The environment deliberately does not contain a full AXI memory UVM agent or a virtual sequencer. AXI memory behavior is provided by the HDL `axi_mem_proxy` and `axi_ram`, controlled through `dma_mem_ctrl_if`.
 
