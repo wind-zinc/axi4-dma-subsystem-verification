@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+<svg width="1600" height="1000" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg">
+ <defs>
+  <style>text { font-family: Arial, Helvetica, sans-serif; fill: #000; }
+      .title { font-size: 34px; font-weight: 700; }
+      .group-title { font-size: 25px; font-weight: 700; }
+      .node-title { font-size: 21px; font-weight: 700; }
+      .body { font-size: 17px; }
+      .small { font-size: 15px; }
+      .group { fill: #fff; stroke: #000; stroke-width: 2.4; }
+      .node { fill: #fff; stroke: #000; stroke-width: 2; }
+      .wire { fill: none; stroke: #000; stroke-width: 2; marker-end: url(#arrow); }
+      .bidir { fill: none; stroke: #000; stroke-width: 2; marker-start: url(#arrow); marker-end: url(#arrow); }
+      .plain { fill: none; stroke: #000; stroke-width: 2; }</style>
+ </defs>
+ <!-- Descriptor dispatch originates only at Request FIFO. -->
+ <!-- Status returns originate at the corresponding DMA engines. -->
+ <g class="layer">
+  <title>Layer 1</title>
+  <rect fill="#fff" height="1000" id="svg_2" transform="matrix(1 0 0 1 0 7.60456)" width="1600"/>
+  <text class="title" id="svg_3" text-anchor="middle" x="800" y="48">AXI4 Mem-to-Mem DMA Subsystem Architecture</text>
+  <rect class="node" height="62" id="svg_4" width="300" x="650" y="78"/>
+  <text class="node-title" id="svg_5" text-anchor="middle" x="800" y="116">AXI4-Lite Slave</text>
+  <path class="bidir" d="m800,140l0,40" id="svg_6"/>
+  <text class="body" id="svg_7" x="820" y="166">register access</text>
+  <rect class="group" height="290" id="svg_8" width="840" x="380" y="180"/>
+  <text class="group-title" id="svg_9" text-anchor="middle" x="800" y="215">dma_desc_manager</text>
+  <rect class="node" height="190" id="svg_10" width="240" x="410" y="238"/>
+  <text class="node-title" id="svg_11" text-anchor="middle" x="530" y="270">Control / Status</text>
+  <text class="node-title" id="svg_12" text-anchor="middle" x="530" y="296">Registers</text>
+  <text class="body" id="svg_13" text-anchor="middle" x="530" y="329">staging regs</text>
+  <text class="body" id="svg_14" text-anchor="middle" x="530" y="355">control regs</text>
+  <text class="body" id="svg_15" text-anchor="middle" x="530" y="381">status regs</text>
+  <text class="body" id="svg_16" text-anchor="middle" x="530" y="407">irq_enable_reg</text>
+  <rect class="node" height="120" id="svg_17" width="220" x="710" y="238"/>
+  <text class="node-title" id="svg_18" text-anchor="middle" x="820" y="273">Request FIFO (4)</text>
+  <text class="body" id="svg_19" text-anchor="middle" x="820" y="307">write pointer</text>
+  <text class="body" id="svg_20" text-anchor="middle" x="820" y="333">read pointer</text>
+  <rect class="node" height="120" id="svg_21" width="220" x="970" y="238"/>
+  <text class="node-title" id="svg_22" text-anchor="middle" x="1080" y="273">Completion FIFO (4)</text>
+  <text class="body" id="svg_23" text-anchor="middle" x="1080" y="307">write pointer</text>
+  <text class="body" id="svg_24" text-anchor="middle" x="1080" y="333">read pointer</text>
+  <path class="wire" d="m650,300l60,0" id="svg_25"/>
+  <text class="small" id="svg_26" text-anchor="middle" x="680" y="289">submit</text>
+  <path class="wire" d="m970,390l-320,0" id="svg_27" transform="matrix(1.34131 0 0 1 -221.85 0)"/>
+  <text class="small" id="svg_28" text-anchor="middle" transform="matrix(1 0 0 1 92.1844 -4.00802)" x="808" y="414">completion readback</text>
+  <path class="wire" d="m1220,270l140,0" id="svg_29"/>
+  <text class="small" id="svg_30" text-anchor="middle" x="1285" y="258">irq_enable_reg</text>
+  <path class="wire" d="m1220,320l140,0" id="svg_31"/>
+  <text class="small" id="svg_32" text-anchor="middle" x="1285" y="345">comp_fifo_m_valid</text>
+  <path class="node" d="m1360,258l20,0c30,0 30,74 0,74l-20,0l0,-74z" id="svg_33"/>
+  <path class="wire" d="m1410,295l60,0" id="svg_34"/>
+  <text class="node-title" id="svg_35" x="1490" y="302">IRQ</text>
+  <rect class="group" height="190" id="svg_36" width="840" x="380" y="610"/>
+  <text class="group-title" id="svg_37" text-anchor="middle" x="800" y="644">axi_dma</text>
+  <rect class="node" height="92" id="svg_38" width="230" x="430" y="665"/>
+  <text class="node-title" id="svg_39" text-anchor="middle" x="545" y="702">axi_dma_rd</text>
+  <text class="body" id="svg_40" text-anchor="middle" x="545" y="733">AXI AR / R</text>
+  <rect class="node" height="92" id="svg_41" width="230" x="940" y="665"/>
+  <text class="node-title" id="svg_42" text-anchor="middle" x="1055" y="702">axi_dma_wr</text>
+  <text class="body" id="svg_43" text-anchor="middle" x="1055" y="733">AXI AW / W / B</text>
+  <path class="wire" d="m820,358l0,162l-275,0l0,145" id="svg_44"/>
+  <text class="body" id="svg_45" transform="matrix(1 0 0 1 -8.01603 1.002)" x="625" y="508">2) read descriptor</text>
+  <path class="wire" d="m820,358l0,162l235,0l0,145" id="svg_46"/>
+  <text class="body" id="svg_47" transform="matrix(1 0 0 1 -9.01804 -40.0802)" x="870" y="548">1) write descriptor first</text>
+  <path class="wire" d="m429.86,680.03l-119.86,0l0,-235.03l70,0" id="svg_48" transform="matrix(1 0 0 1 0 0)"/>
+  <text class="body" id="svg_49" transform="matrix(1 0 0 1 -133.263 97.0421)" x="320" y="430">read_status_*</text>
+  <path class="wire" d="m1169.14,682.03l119.86,0l1,-237.03l-70,0" id="svg_50"/>
+  <text class="body" id="svg_51" transform="matrix(1 0 0 1 187.375 92.1844)" x="1120" y="430">write_status_*</text>
+  <rect class="node" height="94" id="svg_52" width="245" x="35" y="670"/>
+  <text class="node-title" id="svg_53" text-anchor="middle" x="157" y="706">Source region</text>
+  <text class="body" id="svg_54" text-anchor="middle" x="157" y="735">in AXI Memory</text>
+  <path class="bidir" d="m280,717l150,0" id="svg_55"/>
+  <text class="body" id="svg_56" text-anchor="middle" transform="matrix(1 0 0 1 -22.0441 51.1022)" x="355" y="694">AXI4 Read</text>
+  <text class="small" id="svg_57" text-anchor="middle" transform="matrix(1 0 0 1 -25.0501 23.0461)" x="355" y="744">AR / R</text>
+  <rect class="node" height="94" id="svg_58" width="245" x="1320" y="670"/>
+  <text class="node-title" id="svg_59" text-anchor="middle" x="1442" y="706">Destination region</text>
+  <text class="body" id="svg_60" text-anchor="middle" x="1442" y="735">in AXI Memory</text>
+  <path class="bidir" d="m1170,717l150,0" id="svg_61"/>
+  <text class="body" id="svg_62" text-anchor="middle" transform="matrix(1 0 0 1 22.0441 51.1022)" x="1245" y="694">AXI4 Write</text>
+  <text class="small" id="svg_63" text-anchor="middle" transform="matrix(1 0 0 1 21.0421 24.0481)" x="1245" y="744">AW / W / B</text>
+  <rect class="node" height="92" id="svg_64" width="300" x="650" y="858"/>
+  <text class="node-title" id="svg_65" text-anchor="middle" transform="matrix(1 0 0 1 0 0)" x="800" y="895">axis_fifo (16)</text>
+  <text class="body" id="svg_66" text-anchor="middle" x="800" y="928">TDATA / TKEEP / TLAST</text>
+  <path class="wire" d="m545,757l0,73l175,0l0,28" id="svg_67"/>
+  <text class="body" id="svg_68" x="575" y="821">AXI-Stream</text>
+  <path class="wire" d="m880,858l0,-28l175,0l0,-73" id="svg_69"/>
+  <text class="body" id="svg_70" x="920" y="821">AXI-Stream</text>
+  <text class="body" id="svg_71" text-anchor="middle" x="800" y="982">Completion is queued after both read and write status pulses are received.</text>
+  <path d="m1081.16,361.92c0,0.89 0,1.83 0,2.84c0,0.76 -0.15,1.54 -0.65,2.28c-0.45,0.68 -0.35,1.73 -0.35,2.48c0,0.91 0.13,1.82 0,2.72c-0.14,0.93 -0.71,1.59 -0.94,2.36l-0.06,0.95l0,0.99l0,0.7" fill="none" id="svg_72"/>
+  <line fill="none" id="svg_74" stroke="#000000" stroke-width="2" transform="rotate(-1.67647 1078.93 374.608)" x1="1079.43" x2="1078.42" y1="358.54" y2="390.68"/>
+ </g>
+</svg>
