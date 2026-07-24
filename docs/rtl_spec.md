@@ -60,11 +60,14 @@ axi_dma_subsystem
 | `write_enable` | 输入 | 写通道使能 | 控制写 DMA 子模块是否允许接收任务 |
 | `write_abort` | 输入 | 写操作中止控制 | 请求中止当前写操作 |
 
+`write_abort`为vendor DMA预留输入，因源仓库未实现且现已停止维护，故当前版本固定为0，即不支持DMA中止功能。
+
 ---
 
 ## axi_dma_rd
 
 根据描述符从 AXI 总线读取数据，根据 4 KB 边界、最大 burst 长度、剩余传输长度和地址偏移自动拆分 AXI burst；读取的数据通过 AXIS 输出，并在任务结束后报告错误码。
+AXI burst不得跨越4KB边界。DMA根据当前地址、剩余长度和最大burst长度自动拆分读写burst。源地址和目的地址分别独立计算边界拆分。
 
 | 接口信号 | 接口方向 | 接口定义 | 备注 |
 |---|---|---|---|
@@ -79,7 +82,7 @@ axi_dma_subsystem
 
 ## axi_dma_wr
 
-接收 AXIS 写数据流，通过 AXI 总线写入数据；根据 4 KB 边界、最大 burst 长度、剩余传输长度和地址偏移自动拆分突发，处理数据对齐，并在任务结束后发送错误码。
+接收 AXIS 写数据流，通过 AXI 总线写入数据；根据 4 KB 边界、最大 burst 长度、剩余传输长度和地址偏移自动拆分burst，处理数据对齐，并在任务结束后发送错误码。
 
 | 接口信号 | 接口方向 | 接口定义 | 备注 |
 |---|---|---|---|
@@ -348,6 +351,8 @@ s_axis_write_desc_*
 4. 使用扩展一位的加法检查源地址加长度和目的地址加长度，保证传输范围不超出总地址空间，并防止地址回绕。传输区间按 `[address, address+length)` 解释。
 5. 源地址范围与目的地址范围不重叠。该限制是本子系统的设计策略，不是 AXI 协议本身的限制。
 
+   *Vendor DMA保留非对齐数据移位能力，但当前集成配置为 `ENABLE_UNALIGNED=0` ，仅支持对齐传输，并对非对齐描述符进行拒绝验证。*
+
 软件写 `REG_SUBMIT[0]=1` 后：
 
 ```text
@@ -400,3 +405,22 @@ irq = irq_enable && Completion FIFO 非空
 ```
 
 Completion FIFO 非空且中断使能时，IRQ 保持拉高；软件持续 pop 完成项，当 Completion FIFO 变空后，IRQ 撤销。
+
+## 附：寄存器表
+
+| 地址   | 名称              | 作用                                                           | 备注                                                                                     |
+|--------|-------------------|----------------------------------------------------------------|------------------------------------------------------------------------------------------|
+| 0x00   | CONTROL           | 配置IRQ使能，并清除sticky状态                                   | bit0=IRQ_ENABLE；bit1=CLEAR_STICKY，写1脉冲                                             |
+| 0x04   | STATUS            | 读取DMA、Request FIFO、Completion FIFO及错误状态               | bit0=busy；bit1=req_empty；bit2=req_full；bit3=req_ready；bit4=comp_valid；bit5=comp_full；bit6=irq；bit7=reject_full；bit8=reject_invalid；bit9=status_mismatch；bit10=pop_empty |
+| 0x08   | SRC_ADDR          | 保存DMA源内存的起始字节地址                                     | 提交descriptor前写入；当前要求按数据宽度对齐                                             |
+| 0x0C   | DST_ADDR          | 保存DMA目的内存的起始字节地址                                   | 提交descriptor前写入；当前要求按数据宽度对齐                                             |
+| 0x10   | LENGTH            | 保存本次DMA搬运的字节数                                         | 不能为0；高于LEN_WIDTH的位必须为0                                                         |
+| 0x14   | TAG               | 保存当前descriptor的任务标签                                    | 完成记录中原样返回，用于匹配任务                                                         |
+| 0x18   | SUBMIT            | 将当前配置寄存器组提交到Request FIFO                           | bit0写1触发一次提交；属于W1P命令                                                         |
+| 0x1C   | COMP_TAG          | 读取Completion FIFO队首记录的TAG                               | FIFO为空时读回0                                                                          |
+| 0x20   | COMP_LENGTH       | 读取队首descriptor实际写入的字节数                             | FIFO为空时读回0                                                                          |
+| 0x24   | COMP_STATUS       | 读取队首descriptor的错误和一致性状态                           | [3:0]读错误；[7:4]写错误；[10:8]状态不一致标志                                           |
+| 0x28   | COMP_POP          | 弹出当前Completion FIFO队首记录                                | bit0写1触发一次pop；属于W1P命令                                                          |
+| 0x2C   | QUEUE_LEVELS      | 读取Request FIFO和Completion FIFO当前深度                     | 低位为Request FIFO level；从bit16开始为Completion FIFO level                             |
+| 0x30   | SUBMITTED_COUNT   | 读取已成功提交的descriptor数量                                 | 32位累计计数器，复位后清零                                                               |
+| 0x34   | COMPLETED_COUNT   | 读取已完成并写入Completion FIFO的descriptor数量               | 32位累计计数器，复位后清零                                                               |
