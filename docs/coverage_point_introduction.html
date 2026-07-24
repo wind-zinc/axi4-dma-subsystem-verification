@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AXI4 DMA Functional Coverage</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#111b2e;--panel2:#17243b;--line:#2b3b59;--text:#e7eefb;--muted:#9caec8;--accent:#61d1c5;--accent2:#7aa8ff;--warn:#f5c76b}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(135deg,#0b1220,#101b31 55%,#0b1220);color:var(--text);font:15px/1.55 Inter,Segoe UI,Arial,sans-serif;min-height:100vh}
+button{font:inherit;color:inherit}
+.shell{max-width:1240px;margin:0 auto;padding:28px 22px 50px}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding-bottom:22px;border-bottom:1px solid var(--line)}
+.eyebrow{color:var(--accent);font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+h1{margin:6px 0 5px;font-size:clamp(26px,4vw,42px);line-height:1.1}
+.subtitle{margin:0;color:var(--muted);max-width:760px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.stat{background:rgba(23,36,59,.8);border:1px solid var(--line);border-radius:10px;padding:10px 13px;min-width:90px}
+.stat strong{display:block;font-size:20px;color:var(--accent)}
+.stat span{font-size:11px;color:var(--muted)}
+.breadcrumb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:22px 0 18px;color:var(--muted)}
+.breadcrumb button{border:0;background:none;padding:0;color:var(--accent2);cursor:pointer}
+.breadcrumb button:hover{text-decoration:underline}
+.breadcrumb .current{color:var(--text)}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px}
+.toolbar h2{margin:0;font-size:21px}
+.back{border:1px solid var(--line);background:var(--panel);padding:8px 14px;border-radius:8px;cursor:pointer}
+.back:hover{border-color:var(--accent);background:var(--panel2)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.card{display:block;width:100%;text-align:left;border:1px solid var(--line);background:rgba(17,27,46,.88);border-radius:12px;padding:17px;cursor:pointer;transition:transform .15s,border-color .15s,background .15s}
+.card:hover,.card:focus-visible{transform:translateY(-2px);border-color:var(--accent);background:var(--panel2);outline:none}
+.card h3{margin:0 0 7px;font-size:17px}
+.card p{margin:0;color:var(--muted);font-size:13px}
+.card .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.badge{display:inline-flex;align-items:center;border:1px solid #385276;background:#152641;color:#b9cbed;padding:3px 8px;border-radius:99px;font-size:11px}
+.covergroup-card{border-left:3px solid var(--accent2)}
+.point-card{border-left:3px solid var(--accent)}
+.point-card h3{font-size:15px}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;background:rgba(17,27,46,.88)}
+table{border-collapse:collapse;width:100%;min-width:520px}
+th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:#182841;color:#cbd9f0;font-size:12px;letter-spacing:.03em}
+td{color:#e7eefb}
+tr:last-child td{border-bottom:0}
+.bin-name{color:var(--accent);font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.empty{border:1px dashed var(--line);padding:24px;color:var(--muted);border-radius:10px}
+.note{margin-top:24px;border-left:3px solid var(--warn);padding:12px 15px;background:rgba(245,199,107,.07);color:#d9cda9;border-radius:0 8px 8px 0}
+footer{margin-top:30px;color:var(--muted);font-size:12px}
+@media(max-width:680px){.shell{padding:20px 14px 38px}.topbar{display:block}.stats{justify-content:flex-start;margin-top:16px}.toolbar{align-items:flex-start;flex-direction:column}.table-wrap{margin-inline:-2px}}
+</style>
+</head>
+<body>
+<main class="shell" id="coverage-app">
+<header class="topbar">
+<div>
+<div class="eyebrow">Verification coverage navigator</div>
+<h1>AXI4 DMA Functional Coverage</h1>
+<p class="subtitle">按功能分组浏览 covergroup、coverpoint 与 bin 定义；SVA内容单独维护。</p>
+</div>
+<div class="stats" id="stats"></div>
+</header>
+<nav class="breadcrumb" id="breadcrumb" aria-label="当前位置"></nav>
+<section id="view" aria-live="polite"></section>
+<footer>数据来源：cov.md · 页面可离线打开，点击卡片逐级查看覆盖定义。</footer>
+</main>
+<script id="coverage-source" type="text/plain">Exit code: 0\nWall time: 0.7 seconds\nOutput:\n# AXI4 DMA Coverage 说明\n\n本文档与 `case.md` 的四个测试分组保持一致。每个 coverage point 使用一个四级标题，并单独列出“Bin名称 / 内容 / 备注”三列表格。\n\n## 基础和RAL访问\n\n### `axil_cg`：AXI-Lite访问覆盖\n\n#### AXI-Lite操作方向\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| write | AXI-Lite写事务 | `dma_ral_smoke_test`、`dma_random_smoke_test` |\n| read | AXI-Lite读事务 | 同上，覆盖寄存器读回 |\n\n#### AXI-Lite寄存器地址\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| control/status | CONTROL、STATUS | 基础和RAL访问测试 |\n| descriptor_cfg | SRC、DST、LENGTH、TAG | RAL smoke、随机测试 |\n| command | SUBMIT、COMP_POP | RAL smoke、command noop |\n| completion | COMP_TAG、COMP_LENGTH、COMP_STATUS | completion读取测试 |\n| queue_count | QUEUE、COUNT、submitted/completed count | 队列和状态测试 |\n\n#### WSTRB\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| byte0 | `4'b0001` | `dma_wstrb_test` |\n| byte1 | `4'b0010` | `dma_wstrb_test` |\n| byte2 | `4'b0100` | `dma_wstrb_test` |\n| byte3 | `4'b1000` | `dma_wstrb_test` |\n| multi_byte | 多个字节有效但不是全字节 | `dma_wstrb_test` |\n| all_bytes | `4'b1111` | 正常寄存器写入 |\n\n#### AXI-Lite响应\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| okay | 合法访问返回OKAY | 基础/RAL测试 |\n| protected | 只读寄存器写入后的保护响应或保持不变 | `dma_ro_write_protection_test` |\n| default | 未实现地址的安全读写响应 | `dma_access_policy_test` |\n\n### `ral_register_access`：RAL frontdoor覆盖\n\n#### 配置寄存器frontdoor写\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| src | 通过 `uvm_reg::write()` 写SRC | `dma_ral_smoke_test` |\n| dst | 通过RAL写DST | `dma_ral_smoke_test` |\n| length | 通过RAL写LENGTH | `dma_ral_smoke_test` |\n| tag | 通过RAL写TAG | `dma_ral_smoke_test` |\n\n#### 命令寄存器frontdoor写\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| submit | 写SUBMIT触发提交 | RAL smoke |\n| comp_pop | 写COMP_POP弹出完成记录 | RAL smoke、completion测试 |\n| noop | 命令位为0或无效组合 | `dma_command_noop_test` |\n\n#### 状态寄存器frontdoor读\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| status | 读取STATUS | RAL smoke |\n| completion_fields | 读取COMP_TAG、COMP_LENGTH、COMP_STATUS | completion读取测试 |\n| queue_levels | 读取QUEUE_LEVELS和COUNT | 队列测试 |\n\n### `read_only_protection_cg`：只读寄存器保护\n\n#### RO寄存器写入\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| status_ro | 写STATUS后值保持只读语义 | `dma_ro_write_protection_test` |\n| completion_ro | 写COMP_TAG、COMP_LENGTH、COMP_STATUS | 同上 |\n| queue_ro | 写QUEUE_LEVELS、SUBMITTED_COUNT、COMPLETED_COUNT | 同上 |\n\n#### 未实现地址访问\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| default_read | 读取未实现地址 | `dma_access_policy_test` |\n| benign_write | 写未实现地址且不触发DMA | `dma_access_policy_test` |\n\n## Descriptor合法性与队列\n\n### `descriptor_cg`：descriptor属性覆盖\n\n#### descriptor合法性\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| legal | 地址、长度和TAG均合法 | `dma_random_smoke_test` |\n| invalid | 至少一个字段非法 | `dma_invalid_desc_test` |\n\n#### 长度类型\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| zero | 长度为0 | `dma_invalid_desc_test` |\n| one_byte | 1字节长度 | 长度边界测试 |\n| sub_beat | 小于一个AXI beat | `dma_length_sweep_test` |\n| full_beat | 一个完整beat | 同上 |\n| multi_beat | 多个beat | 基础和随机测试 |\n| long_transfer | 长burst或多burst传输 | 长度扫描 |\n\n#### 地址对齐\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| aligned | 地址按数据宽度对齐 | 正常传输 |\n| offset1 | 地址低位偏移1 | `dma_alignment_reject_test` |\n| offset2 | 地址低位偏移2 | 同上 |\n| offset3 | 地址低位偏移3 | 同上 |\n\n#### TAG\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| tag_zero | TAG为0 | TAG边界测试 |\n| tag_nonzero | 多个非零TAG | `dma_random_smoke_test`、`dma_sub_beat_tag_test` |\n| tag_max | TAG最大值 | 边界/随机测试 |\n\n#### 源/目的范围\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| legal_range | 地址加长度未越界 | 正常测试 |\n| wrap_reject | 地址或长度导致范围回绕 | `dma_address_range_reject_test` |\n\n#### 源目的关系\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| non_overlap | 源目的区间不重叠 | 正常测试 |\n| overlap_reject | 源目的区间重叠并被拒绝 | `dma_overlap_reject_test` |\n\n#### 高位合法性\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| high_bits_zero | 地址、长度、TAG高位满足约束 | 正常测试 |\n| high_bits_overflow | 高位溢出或不符合宽度 | `dma_address_range_reject_test` |\n\n### `queue_level_cg`：FIFO深度覆盖\n\n#### Request FIFO状态\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| empty | FIFO为空 | 空闲状态 |\n| level1 | FIFO中有1条请求 | `dma_queue_mid_level_test` |\n| level2 | FIFO中有2条请求 | 同上 |\n| mid_level | FIFO处于中间深度 | `dma_queue_mid_level_test` |\n| full | FIFO达到容量上限 | `dma_queue_saturation_test` |\n\n#### Completion FIFO状态\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| empty | 没有completion | `dma_empty_completion_read_test` |\n| non_empty | 至少存在一条completion | RAL smoke、IRQ测试 |\n| full | completion FIFO达到容量上限 | completion积累测试 |\n\n#### FIFO操作\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| push | 成功写入FIFO | 队列测试 |\n| pop | 成功弹出FIFO | RAL smoke、completion测试 |\n| simultaneous | 同周期push和pop | 队列随机测试 |\n\n### `manager_status_cg`：管理器状态覆盖\n\n#### DMA管理状态\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| idle | 管理器空闲 | 所有测试的起始/结束 |\n| send_write | 发送写descriptor | 正常搬运 |\n| send_read | 发送读descriptor | 正常搬运 |\n| wait_status | 等待读写完成状态 | 正常和延迟测试 |\n| push_completion | 生成completion记录 | completion测试 |\n\n#### submit状态\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| ready | 可以接收提交 | 基础测试 |\n| accepted | descriptor被接受 | 正常测试 |\n| rejected_full | FIFO满时拒绝 | `dma_queue_saturation_test` |\n| rejected_invalid | 非法descriptor被拒绝 | `dma_invalid_desc_test` |\n\n#### sticky状态\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| clear | 错误/完成状态清除 | RAL和命令测试 |\n| set | 错误或完成状态置位 | 非法/错误测试 |\n| readback | 通过STATUS读回 | `dma_ral_smoke_test` |\n\n## AXI传输、错误和反压\n\n### `boundary_cg`：4KB边界覆盖\n\n#### 源地址边界\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| source_no_cross | 源burst不跨4KB边界 | `dma_boundary_matrix_test` |\n| source_cross | 源burst跨4KB边界并拆分 | 同上 |\n\n#### 目的地址边界\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| destination_no_cross | 目的burst不跨4KB边界 | 边界矩阵 |\n| destination_cross | 目的burst跨4KB边界并拆分 | 边界矩阵、写引擎corner |\n\n#### 同时跨界\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| neither | 源和目的都不跨界 | `dma_boundary_matrix_test` |\n| source_only | 只有源地址跨界 | 同上 |\n| destination_only | 只有目的地址跨界 | 同上 |\n| both | 源和目的同时跨界 | 同上 |\n\n#### burst长度限制\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| max_burst | 达到最大burst长度 | 长度扫描 |\n| residual_burst | 末尾剩余burst | 长度扫描 |\n| boundary_shortened | 因4KB边界而缩短burst | 边界矩阵 |\n\n### `cp_read_error`：读错误覆盖\n\n#### 读响应错误\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| _none | 读响应为OKAY | 所有正常搬运测试 |\n| slverr | 读响应为SLVERR | `dma_read_slverr_test` |\n| decerr | 读响应为DECERR | `dma_read_decerr_test` |\n\n### `cp_write_error`：写错误覆盖\n\n#### 写响应错误\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| _none | 写响应为OKAY | 所有正常搬运测试 |\n| slverr | 写响应为SLVERR | `dma_write_slverr_test` |\n| decerr | 写响应为DECERR | `dma_write_decerr_test` |\n\n### `axis_backpressure_cg`：AXIS反压覆盖\n\n#### AXIS握手\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| transfer | `TVALID && TREADY` | 基础搬运、反压测试 |\n| blocked | `TVALID && !TREADY` | `dma_axi_backpressure_test` |\n| resumed | 阻塞后重新握手 | 同上 |\n\n#### FIFO反压传播\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| fifo_not_full | FIFO未满，读端继续接收 | 反压测试 |\n| fifo_full | FIFO满并向上游施加反压 | 反压测试 |\n| recovery | FIFO清空后恢复传输 | 反压测试 |\n\n### `axi_channel_stall_cg`：AXI通道stall覆盖\n\n#### AW通道stall\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| aw_stall | `AWVALID && !AWREADY` | `dma_axi_backpressure_test` |\n| aw_transfer | `AWVALID && AWREADY` | 正常写事务 |\n\n#### W通道stall\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| w_stall | `WVALID && !WREADY` | 反压测试 |\n| w_transfer | `WVALID && WREADY` | 正常写事务 |\n\n#### B通道stall\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| b_stall | `BVALID && !BREADY` | 反压测试、写引擎corner |\n| b_transfer | `BVALID && BREADY` | 正常写响应 |\n\n#### AR通道stall\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| ar_stall | `ARVALID && !ARREADY` | 反压测试 |\n| ar_transfer | `ARVALID && ARREADY` | 正常读事务 |\n\n#### R通道stall\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| r_stall | `RVALID && !RREADY` | 反压测试 |\n| r_transfer | `RVALID && RREADY` | 正常读数据 |\n\n### `outstanding_cg`：AXI在途事务覆盖\n\n#### 读在途burst深度\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| zero | 没有未完成读burst | 空闲/完成阶段 |\n| one | 一个在途burst | `dma_outstanding_test` |\n| two | 两个在途burst | 同上 |\n| multiple | 多个在途burst | 同上，高延迟memory |\n\n#### 写在途burst深度\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| zero | 没有未完成写burst | 空闲/完成阶段 |\n| one | 一个在途burst | `dma_outstanding_test` |\n| two | 两个在途burst | 同上 |\n| multiple | 多个在途burst | 同上 |\n\n#### 延迟响应\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| delayed_r | R响应延迟后数据仍正确 | `dma_outstanding_test` |\n| delayed_b | B响应延迟后数据仍正确 | 同上 |\n\n### `axi_dma_wr_corner_cg`：写引擎边界覆盖\n\n#### 部分最后beat\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| short_length | 长度小于完整beat | `dma_write_engine_corner_test` |\n| partial_tkeep | 最后一拍TKEEP部分有效 | 长度扫描 |\n| full_tkeep | 最后一拍全部字节有效 | 正常测试 |\n\n#### 写状态机恢复\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| finish_burst | 正常完成burst | 写引擎corner |\n| drop_data | 异常AXIS边界下丢弃/收尾路径 | 白盒异常场景 |\n\n#### 状态FIFO积累\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| b_delayed | B响应延迟导致状态积累 | 写引擎corner |\n| status_capacity | status FIFO达到容量限制 | 写引擎corner |\n\n## Completion、IRQ、复位和SVA\n\n### `completion_cg`：完成记录覆盖\n\n#### completion存在\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| empty | completion FIFO为空 | `dma_empty_completion_read_test` |\n| valid | completion FIFO非空 | RAL smoke、IRQ测试 |\n| pop | 成功弹出completion | completion和RAL测试 |\n\n#### TAG匹配\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| expected | 返回TAG等于提交TAG | 正常完成 |\n| mismatch | 返回TAG不匹配并被检测 | 状态错误测试 |\n\n#### 写入长度\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| expected_length | completion长度等于期望值 | 长度扫描 |\n| mismatch_length | completion长度不匹配并被检测 | 异常状态测试 |\n\n#### completion状态\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| no_error | 无错误完成 | 正常测试 |\n| read_error | 读错误完成 | 读SLVERR/DECERR |\n| write_error | 写错误完成 | 写SLVERR/DECERR |\n| mismatch_error | TAG或长度不匹配 | 状态错误测试 |\n\n### `irq_cg`：IRQ覆盖\n\n#### IRQ使能\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| disabled | `irq_enable=0` | `dma_irq_mode_test` |\n| enabled | `irq_enable=1` | 同上 |\n\n#### completion与IRQ\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| no_completion | 没有completion时IRQ保持低 | IRQ模式测试 |\n| completion_irq | completion有效且IRQ有效 | IRQ模式、RAL smoke |\n\n#### IRQ电平\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| held_high | completion FIFO非空期间保持高 | `dma_irq_mode_test` |\n| deassert_after_pop | 最后一条completion弹出后拉低 | 同上 |\n| level_not_pulse | 多条completion不要求每条产生上升沿 | completion积累测试 |\n\n### `reset_cg`：复位恢复覆盖\n\n#### 复位位置\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| idle | IDLE状态下复位 | `dma_reset_recovery_test` |\n| descriptor_active | descriptor发送期间复位 | 同上 |\n| axi_active | AXI传输期间复位 | 同上 |\n\n#### 复位后状态\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| fifo_empty | 请求/完成FIFO清空 | 复位测试 |\n| manager_idle | 管理器回到IDLE | 复位测试 |\n| irq_low | IRQ清零 | 复位测试 |\n\n#### 复位后恢复\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| resubmit | 复位后重新提交descriptor | `dma_reset_recovery_test` |\n| complete | 复位后重新搬运并完成 | 同上 |\n\n### SVA覆盖与断言点\n\n#### AXI-Lite稳定性\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| ar_stable_success | ARVALID保持且ARREADY为0时地址稳定 | `dma_sva_activation_test` |\n| aw_stable_success | AWVALID保持且AWREADY为0时地址稳定 | 同上 |\n| w_stable_success | WVALID保持且WREADY为0时数据稳定 | 同上 |\n| b_stable_success | BVALID保持且BREADY为0时响应稳定 | 同上 |\n| r_stable_success | RVALID保持且RREADY为0时数据稳定 | 同上 |\n\n#### Descriptor稳定性\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| read_desc_stable | 读descriptor被阻塞时字段稳定 | `dma_sva_activation_test` |\n| write_desc_stable | 写descriptor被阻塞时字段稳定 | 同上 |\n\n#### AXI通道stall\n\n| Bin名称 | 内容 | 备注 |\n|---|---|---|\n| ar_stall | AXI读地址通道被阻塞 | `dma_axi_backpressure_test` |\n| r_stall | AXI读数据通道被阻塞 | 同上 |\n| aw_stall | AXI写地址通道被阻塞 | 同上 |\n| w_stall | AXI写数据通道被阻塞 | 同上 |\n| axis_backpressure | AXIS有效但下游未准备好 | 同上 |\n\r\n</script>
+<script>
+(function(){
+  var source = JSON.parse('"' + document.getElementById('coverage-source').textContent + '"');
+  var app = document.getElementById('coverage-app');
+  var view = document.getElementById('view');
+  var breadcrumb = document.getElementById('breadcrumb');
+  var stats = document.getElementById('stats');
+  var model = parseMarkdown(source);
+  var state = {module:null, group:null, point:null};
+
+  function clean(s){
+    return s.trim().replace(/^\`|\`$/g,'').replace(/\`/g,'');
+  }
+  function parseMarkdown(text){
+    var lines=text.split(/\r?\n/), modules=[], currentModule=null, currentGroup=null, currentPoint=null;
+    for(var i=0;i<lines.length;i++){
+      var line=lines[i];
+      var m;
+      if((m=line.match(/^## (.+)$/)) && !/^当前覆盖边界/.test(m[1])){
+        currentModule={name:clean(m[1]).replace(/和SVA$/,''),groups:[]}; modules.push(currentModule);
+        currentGroup=null; currentPoint=null; continue;
+      }
+      if((m=line.match(/^### (.+)$/)) && currentModule){
+        var groupName=clean(m[1]);
+        if(/^SVA覆盖与断言点/.test(groupName)){ currentGroup=null; currentPoint=null; continue; }
+        currentGroup={name:groupName,points:[]}; currentModule.groups.push(currentGroup);
+        currentPoint=null; continue;
+      }
+      if((m=line.match(/^#### (.+)$/)) && currentGroup){
+        currentPoint={name:clean(m[1]),bins:[]}; currentGroup.points.push(currentPoint);
+        var j=i+1;
+        while(j<lines.length && !/^#### |^### |^## /.test(lines[j])){
+          if(/^\|/.test(lines[j]) && !/^\|---/.test(lines[j]) && !/^\| *Bin名称/.test(lines[j])){
+            var cells=lines[j].split('|').slice(1,-1).map(function(x){return clean(x);});
+            if(cells.length>=3){currentPoint.bins.push({name:cells[0],content:cells[1],note:cells[2]});}
+          }
+          j++;
+        }
+        continue;
+      }
+    }
+    return modules;
+  }
+  function esc(s){
+    return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});
+  }
+  function countPoints(mod){return mod.groups.reduce(function(n,g){return n+g.points.length;},0);}
+  function countBins(mod){return mod.groups.reduce(function(n,g){return n+g.points.reduce(function(k,p){return k+p.bins.length;},0);},0);}
+  function renderStats(){
+    var groups=model.reduce(function(n,m){return n+m.groups.length;},0);
+    var points=model.reduce(function(n,m){return n+countPoints(m);},0);
+    var bins=model.reduce(function(n,m){return n+countBins(m);},0);
+    stats.innerHTML='<div class="stat"><strong>'+model.length+'</strong><span>模块</span></div>'+
+      '<div class="stat"><strong>'+groups+'</strong><span>covergroup</span></div>'+
+      '<div class="stat"><strong>'+points+'</strong><span>coverpoint</span></div>'+
+      '<div class="stat"><strong>'+bins+'</strong><span>bin</span></div>';
+  }
+  function button(label,cls,fn){
+    var b=document.createElement('button'); b.type='button'; b.className=cls||'card'; b.textContent=label; b.addEventListener('click',fn); return b;
+  }
+  function renderBreadcrumb(){
+    var parts=[];
+    parts.push(button('总览','',function(){state={module:null,group:null,point:null};render();}));
+    if(state.module!==null){
+      parts.push(document.createTextNode('›'));
+      parts.push(button(model[state.module].name,'',function(){state.group=null;state.point=null;render();}));
+    }
+    if(state.group!==null){
+      parts.push(document.createTextNode('›'));
+      parts.push(button(model[state.module].groups[state.group].name,'',function(){state.point=null;render();}));
+    }
+    if(state.point!==null){
+      parts.push(document.createTextNode('›'));
+      var span=document.createElement('span'); span.className='current'; span.textContent=model[state.module].groups[state.group].points[state.point].name; parts.push(span);
+    }
+    breadcrumb.replaceChildren.apply(breadcrumb,parts);
+  }
+  function render(){
+    renderStats(); renderBreadcrumb(); view.replaceChildren();
+    if(state.module===null){renderHome();return;}
+    var mod=model[state.module];
+    if(state.group===null){renderModule(mod);return;}
+    var group=mod.groups[state.group];
+    if(state.point===null){renderGroup(group);return;}
+    renderPoint(group.points[state.point],group);
+  }
+  function heading(title,backFn){
+    var bar=document.createElement('div'); bar.className='toolbar';
+    var h=document.createElement('h2'); h.textContent=title; bar.appendChild(h);
+    if(backFn) bar.appendChild(button('返回上一级','back',backFn));
+    view.appendChild(bar);
+  }
+  function renderHome(){
+    heading('四个覆盖模块');
+    var grid=document.createElement('div'); grid.className='grid';
+    model.forEach(function(mod,idx){
+      var b=button('', 'card', function(){state.module=idx;state.group=null;state.point=null;render();});
+      b.innerHTML='<h3>'+esc(mod.name)+'</h3><p>浏览该模块下的 covergroup 与 coverpoint。</p><div class="meta"><span class="badge">'+mod.groups.length+' covergroup</span><span class="badge">'+countPoints(mod)+' coverpoint</span><span class="badge">'+countBins(mod)+' bin</span></div>';
+      grid.appendChild(b);
+    });
+    view.appendChild(grid);
+  }
+  function renderModule(mod){
+    heading(mod.name,function(){state={module:null,group:null,point:null};render();});
+    var grid=document.createElement('div'); grid.className='grid';
+    mod.groups.forEach(function(group,idx){
+      var b=button('', 'card covergroup-card', function(){state.group=idx;state.point=null;render();});
+      b.innerHTML='<h3>'+esc(group.name)+'</h3><p>点击查看该 covergroup 下的覆盖点。</p><div class="meta"><span class="badge">'+group.points.length+' coverpoint</span><span class="badge">'+group.points.reduce(function(n,p){return n+p.bins.length;},0)+' bin</span></div>';
+      grid.appendChild(b);
+    });
+    view.appendChild(grid);
+  }
+  function renderGroup(group){
+    heading(group.name,function(){state.group=null;state.point=null;render();});
+    var grid=document.createElement('div'); grid.className='grid';
+    group.points.forEach(function(point,idx){
+      var b=button('', 'card point-card', function(){state.point=idx;render();});
+      b.innerHTML='<h3>'+esc(point.name)+'</h3><p>点击查看 Bin名称、内容和备注。</p><div class="meta"><span class="badge">'+point.bins.length+' bin</span></div>';
+      grid.appendChild(b);
+    });
+    view.appendChild(grid);
+  }
+  function renderPoint(point,group){
+    heading(point.name,function(){state.point=null;render();});
+    if(!point.bins.length){var e=document.createElement('div');e.className='empty';e.textContent='该 coverage point 暂无 bin 定义。';view.appendChild(e);return;}
+    var wrap=document.createElement('div');wrap.className='table-wrap';
+    var table=document.createElement('table');
+    table.innerHTML='<thead><tr><th>Bin名称</th><th>内容</th><th>备注</th></tr></thead>';
+    var body=document.createElement('tbody');
+    point.bins.forEach(function(bin){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td class="bin-name">'+esc(bin.name)+'</td><td>'+esc(bin.content)+'</td><td>'+esc(bin.note)+'</td>';
+      body.appendChild(tr);
+    });
+    table.appendChild(body);wrap.appendChild(table);view.appendChild(wrap);
+    var note=document.createElement('div');note.className='note';note.textContent='所属分组：'+group.name;view.appendChild(note);
+  }
+  render();
+})();
+</script>
+</body>
+</html>
