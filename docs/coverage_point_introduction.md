@@ -1,6 +1,6 @@
 # AXI4 DMA Coverage 说明
 
-本文档与 `case.md` 的四个测试分组保持一致。每个 coverage point 使用一个四级标题，并单独列出“Bin名称 / 内容 / 备注”三列表格。
+因markdown格式与systemverilog关键字原因，文中将部分关键字名称`_none`写作`none`，不影响语义。
 
 ## 基础和RAL访问
 
