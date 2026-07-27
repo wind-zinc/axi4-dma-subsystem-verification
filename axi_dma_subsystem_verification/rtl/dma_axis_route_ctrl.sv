@@ -4,8 +4,8 @@
 import dma_subsystem_pkg::*;
 
 module dma_axis_route_ctrl (
-    input  logic clk,
-    input  logic rst,
+    input  wire clk,
+    input  wire rst,
 
     input  logic [DMA_CH_COUNT-1:0] route_req_valid,
     input  logic [DMA_CH_COUNT-1:0] route_req_src,

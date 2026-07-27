@@ -4,8 +4,8 @@
 import dma_subsystem_pkg::*;
 
 module dma_irq_status_ctrl (
-    input logic clk,
-    input logic rst,
+    input wire clk,
+    input wire rst,
 
     input logic [AXIL_BLOCK_ADDR_WIDTH-1:0] s_axil_awaddr,
     input logic [2:0]                       s_axil_awprot,

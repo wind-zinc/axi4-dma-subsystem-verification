@@ -6,8 +6,8 @@ import dma_subsystem_pkg::*;
 module dma_desc_manager #(
     parameter bit ENABLE_UNALIGNED_PARAM = ENABLE_UNALIGNED
 ) (
-    input logic clk,
-    input logic rst,
+    input wire clk,
+    input wire rst,
 
     input logic [DMA_CH_COUNT-1:0] cmd_valid,
     input dma_cmd_t cmd_payload [DMA_CH_COUNT-1:0],
