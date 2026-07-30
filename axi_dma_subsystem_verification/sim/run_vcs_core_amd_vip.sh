@@ -76,19 +76,71 @@ if [[ "${COMPILE_ONLY:-0}" == "1" ]]; then
   exit 0
 fi
 
+default_test="amd_axi_vip_smoke_test"
 sim_args=("$@")
-test_selected=0
+test_name=""
 
-for arg in "${sim_args[@]}"; do
+for arg in "$@"; do
   if [[ "${arg}" == +UVM_TESTNAME=* ]]; then
-    test_selected=1
-    break
+    selected_name="${arg#+UVM_TESTNAME=}"
+    if [[ -z "${selected_name}" ]]; then
+      echo "ERROR: +UVM_TESTNAME requires a non-empty test name." >&2
+      exit 2
+    fi
+    if [[ -n "${test_name}" ]]; then
+      echo "ERROR: pass exactly one +UVM_TESTNAME argument." >&2
+      exit 2
+    fi
+    test_name="${selected_name}"
   fi
 done
 
-if (( test_selected == 0 )); then
-  echo "No +UVM_TESTNAME supplied; defaulting to amd_axi_vip_smoke_test"
-  sim_args+=(+UVM_TESTNAME=amd_axi_vip_smoke_test)
+if [[ -z "${test_name}" ]]; then
+  test_name="${default_test}"
+  sim_args+=("+UVM_TESTNAME=${test_name}")
+  echo "No +UVM_TESTNAME supplied; defaulting to ${test_name}"
 fi
 
-"${build_dir}/simv" "${sim_args[@]}"
+safe_test_name="${test_name//[^[:alnum:]_.-]/_}"
+sim_log="${SIM_LOG:-${build_dir}/sim_${safe_test_name}.log}"
+mkdir -p "$(dirname "${sim_log}")"
+
+echo "Selected UVM test : ${test_name}"
+echo "Compile log       : ${build_dir}/compile.log"
+echo "Simulation log    : ${sim_log}"
+
+# Mirror the complete runtime transcript to a dedicated simulation log.  Keep
+# the simulator's real exit status instead of tee's status.
+set +e
+"${build_dir}/simv" "${sim_args[@]}" 2>&1 | tee "${sim_log}"
+sim_status="${PIPESTATUS[0]}"
+set -e
+
+if (( sim_status != 0 )); then
+  echo "ERROR: simv exited with status ${sim_status}; see ${sim_log}" >&2
+  exit "${sim_status}"
+fi
+
+if ! grep -Fq "Running test ${test_name}" "${sim_log}"; then
+  echo "ERROR: no UVM [RNTST] evidence for ${test_name} was found in ${sim_log}" >&2
+  exit 3
+fi
+
+if [[ "${test_name}" == "${default_test}" ]] &&
+   ! grep -Fq "All five AMD AXI VIP agents passed the first smoke test" "${sim_log}"; then
+  echo "ERROR: ${default_test} started, but its final success marker is missing." >&2
+  exit 4
+fi
+
+if ! grep -Eq '^[[:space:]]*UVM_ERROR[[:space:]]*:[[:space:]]*0([[:space:]]|$)' "${sim_log}"; then
+  echo "ERROR: the UVM report does not show UVM_ERROR : 0." >&2
+  exit 5
+fi
+
+if ! grep -Eq '^[[:space:]]*UVM_FATAL[[:space:]]*:[[:space:]]*0([[:space:]]|$)' "${sim_log}"; then
+  echo "ERROR: the UVM report does not show UVM_FATAL : 0." >&2
+  exit 6
+fi
+
+echo "PASS: ${test_name} ran to completion with UVM_ERROR=0 and UVM_FATAL=0."
+echo "PASS evidence: ${sim_log}"
