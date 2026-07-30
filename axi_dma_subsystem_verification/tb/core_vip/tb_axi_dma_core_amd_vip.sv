@@ -232,18 +232,14 @@ module tb_axi_dma_core_amd_vip;
         rst = 1'b0;
     end
 
-    // A plain elaboration run resets the DUT and exits.  UVM tests can wait
-    // for negedge rst and construct AMD agents through the static instances
-    // above (for example u_axil_cpu_vip.inst.IF).
+    // Every simulation must start a UVM test so all five generated VIP
+    // agents drive defined idle values before reset is released.  The
+    // launcher supplies amd_axi_vip_smoke_test when no test is specified.
     initial begin
-        if ($test$plusargs("UVM_TESTNAME")) begin
-            run_test();
-        end else begin
-            @(negedge rst);
-            repeat (2) @(posedge clk);
-            $display("[AMD-VIP-ELAB] Core plus five AMD AXI VIP instances elaborated");
-            $finish;
+        if (!$test$plusargs("UVM_TESTNAME")) begin
+            $fatal(1, "No UVM test selected; use run_vcs_core_amd_vip.sh or pass +UVM_TESTNAME=<test>");
         end
+        run_test();
     end
 endmodule
 

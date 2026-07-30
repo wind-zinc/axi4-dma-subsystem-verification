@@ -1,35 +1,62 @@
-# Core and RAM-wrapper verification topology
+# Active AMD AXI VIP verification topology
 
-`axi_dma_subsystem_core` is the reusable DUT.  It contains the control plane,
-two DMA channels, the AXIS route/switch fabric, and the AXI crossbar.  Its two
-flattened `m_axi_mem_*` ports are the AXI master interfaces after address
-decode: index 0 is the RAM0 region and index 1 is the RAM1 region.
+`axi_dma_subsystem_core` is the active DUT. It contains the AXI-Lite control
+plane, two DMA channels, the AXIS route/switch fabric, and the AXI crossbar.
+Its two flattened `m_axi_mem_*` interfaces are the decoded memory-side AXI
+master ports: index 0 is the RAM0 region and index 1 is the RAM1 region.
 
-`axi_dma_subsystem_ram_top` is the reference integration wrapper.  It connects
-those ports to two `axi_ram` instances.  `axi_dma_subsystem_top_wrapper.sv`
-provides the legacy module name `axi_dma_subsystem_top` for the existing smoke
-test; do not compile the legacy monolithic `axi_dma_subsystem_top.sv` in the
-new file-list flows.
+The active verification top is `tb/core_vip/tb_axi_dma_core_amd_vip.sv`.
+It connects five generated AMD AXI VIP instances:
 
-## File lists
+| Instance | Role |
+| --- | --- |
+| `axil_cpu_vip` | AXI4-Lite master for channel register access |
+| `ext_m0_vip`, `ext_m1_vip` | External AXI masters for preload, readback, and competing traffic |
+| `mem0_vip`, `mem1_vip` | AXI slave-memory agents for the two decoded memory ports |
 
-- `sim/run_system_ram.f` compiles the core, RAM wrapper, compatibility top,
-  and the established smoke test.  It is the system-integration baseline.
-- `sim/run_core_vip.f` compiles the same core without `axi_ram`.  The two
-  `axi_mem_vip_if` instances in `tb/core_vip/tb_axi_dma_core_vip_elab.sv` are
-  the attachment points for memory-slave VIPs.  That top is intentionally an
-  elaboration harness only; replace its short initial block with the selected
-  UVM test top after the VIP vendor and licensing flow are chosen.
+The generated VIP sources remain outside the public repository. They are
+loaded from the licensed VM through `AXI_VIP_HOME`.
 
-Both verification environments should retain the same core parameters,
-coverage options, binds, and core instance path.  Merge only coverage rooted
-at the core; publish the RAM-system and VIP-resilience reports separately in
-addition to the merged core report.
+## Active file list and launcher
+
+`sim/run_core_amd_vip.f` is the only active project file list. The launcher
+always compiles this file list and top:
+
+```text
+-f run_core_amd_vip.f -top tb_axi_dma_core_amd_vip
+```
+
+Run the default smoke test:
+
+```bash
+sim/run_vcs_core_amd_vip.sh
+```
+
+Select a UVM test explicitly:
+
+```bash
+sim/run_vcs_core_amd_vip.sh +UVM_TESTNAME=amd_axi_vip_smoke_test
+```
+
+Compile and elaborate without starting `simv`:
+
+```bash
+COMPILE_ONLY=1 sim/run_vcs_core_amd_vip.sh
+```
+
+The launcher defaults to `amd_axi_vip_smoke_test` whenever no
+`+UVM_TESTNAME` argument is supplied. A simulation is never intentionally
+started with inactive VIP agents.
+
+The previous RAM-backed smoke test and its file lists have been removed from
+the active verification flow. `axi_dma_subsystem_ram_top.sv` and
+`axi_dma_subsystem_top.sv` remain optional integration RTL wrappers; they are
+not compiled by `run_core_amd_vip.f`.
 
 ## UVM ownership
 
 Use active AXI-Lite and AXI4 **master VIP agents** as the CPU / bus-master
-transport.  A UVM virtual sequence owns the software-like intent: register
+transport. A UVM virtual sequence owns the software-like intent: register
 programming, external-memory initialization, concurrent traffic, interrupt
-handling, and checking.  A full CPU instruction-set model is unnecessary
+handling, and checking. A full CPU instruction-set model is unnecessary
 unless firmware itself is a verification target.

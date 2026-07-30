@@ -71,4 +71,24 @@ vip_sources=(
   -debug_access+all -kdb -l "${build_dir}/compile.log" \
   -o "${build_dir}/simv"
 
-"${build_dir}/simv" "$@"
+if [[ "${COMPILE_ONLY:-0}" == "1" ]]; then
+  echo "Compile-only mode complete: ${build_dir}/simv"
+  exit 0
+fi
+
+sim_args=("$@")
+test_selected=0
+
+for arg in "${sim_args[@]}"; do
+  if [[ "${arg}" == +UVM_TESTNAME=* ]]; then
+    test_selected=1
+    break
+  fi
+done
+
+if (( test_selected == 0 )); then
+  echo "No +UVM_TESTNAME supplied; defaulting to amd_axi_vip_smoke_test"
+  sim_args+=(+UVM_TESTNAME=amd_axi_vip_smoke_test)
+fi
+
+"${build_dir}/simv" "${sim_args[@]}"
