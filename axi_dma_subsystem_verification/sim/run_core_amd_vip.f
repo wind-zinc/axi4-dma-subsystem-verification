@@ -1,7 +1,18 @@
 +incdir+../rtl
-+incdir+../tb/core_vip
++incdir+../tb
++incdir+../tb/uvm/common
++incdir+../tb/uvm/agents/amd_axi_vip
++incdir+../tb/uvm/agents/dma_subsys_probe
++incdir+../tb/uvm/ral
++incdir+../tb/uvm/env
++incdir+../tb/uvm/env/seq_lib
++incdir+../tb/uvm/tests
 
 ../rtl/dma_subsystem_pkg.sv
+../tb/uvm/common/dma_subsys_tr_pkg.sv
+../tb/uvm/agents/amd_axi_vip/dma_subsys_vip_pkg.sv
+../tb/uvm/agents/dma_subsys_probe/dma_subsys_probe_if.sv
+../tb/uvm/env/dma_subsys_env_pkg.sv
 
 ../rtl/vendor/common/priority_encoder.v
 ../rtl/vendor/common/arbiter.v
@@ -32,5 +43,8 @@
 ../rtl/dma_irq_status_ctrl.sv
 ../rtl/axi_dma_subsystem_core.sv
 
-../tb/core_vip/tb_axi_dma_core_amd_vip.sv
-../tb/core_vip/amd_axi_vip_smoke_test.sv
+../tb/tb_axi_dma_core_amd_vip.sv
+../tb/uvm/tests/dma_subsys_vip_manager_smoke_test.sv
+../tb/uvm/tests/dma_subsys_env_smoke_test.sv
+../tb/uvm/tests/dma_subsys_ch0_to_ch1_test.sv
+../tb/uvm/tests/amd_axi_vip_smoke_test.sv

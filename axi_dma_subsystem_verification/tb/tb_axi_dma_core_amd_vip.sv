@@ -7,6 +7,7 @@
 module tb_axi_dma_core_amd_vip;
     import uvm_pkg::*;
     import dma_subsystem_pkg::*;
+    import dma_subsys_vip_pkg::*;
     `include "uvm_macros.svh"
 
     logic clk;
@@ -108,6 +109,11 @@ module tb_axi_dma_core_amd_vip;
     logic [DMA_CH_COUNT-1:0] irq_ch;
     logic irq;
     logic [DMA_CH_COUNT-1:0] subsys_busy;
+    dma_subsys_vip_cfg vip_cfg;
+
+    dma_subsys_probe_if probe_if (
+        .clk(clk)
+    );
 
     axi_dma_subsystem_core dut (.*);
 
@@ -221,6 +227,62 @@ module tb_axi_dma_core_amd_vip;
         .s_axi_rlast(m_axi_mem_rlast[1]), .s_axi_rvalid(m_axi_mem_rvalid[1]), .s_axi_rready(m_axi_mem_rready[1])
     );
 
+    // Small passive observation surface for system-level UVM monitors.
+    // Only the static testbench knows DUT hierarchy; package classes receive
+    // this interface through uvm_config_db.
+    assign probe_if.reset_n = aresetn;
+    assign probe_if.cmd_valid = dut.cmd_valid;
+    assign probe_if.cmd_ready = dut.cmd_ready;
+    assign probe_if.route_req_valid = dut.route_req_valid;
+    assign probe_if.route_req_src = dut.route_req_src;
+    assign probe_if.route_req_dst = dut.route_req_dst;
+    assign probe_if.route_req_ready = dut.route_req_ready;
+    assign probe_if.route_dest = dut.route_dest;
+    assign probe_if.route_release = dut.route_release;
+    assign probe_if.route_active = dut.route_active;
+    assign probe_if.route_matrix = dut.route_matrix;
+    assign probe_if.route_fault_valid = dut.route_fault_valid;
+    assign probe_if.route_fault_code = dut.route_fault_code;
+    assign probe_if.route_fault_source = dut.route_fault_source;
+    assign probe_if.completion_valid = dut.completion_valid;
+    assign probe_if.combined_fault_valid = dut.combined_fault_valid;
+    assign probe_if.combined_fault = dut.combined_fault;
+    assign probe_if.irq_ch = irq_ch;
+    assign probe_if.global_irq = irq;
+    assign probe_if.busy = subsys_busy;
+    assign probe_if.done_pending =
+        dut.u_irq_status_ctrl.done_pending_reg;
+    assign probe_if.error_pending =
+        dut.u_irq_status_ctrl.error_pending_reg;
+    assign probe_if.done_enable =
+        dut.u_irq_status_ctrl.done_enable_reg;
+    assign probe_if.error_enable =
+        dut.u_irq_status_ctrl.error_enable_reg;
+    assign probe_if.fault_pending =
+        dut.u_irq_status_ctrl.fault_pending_reg;
+    assign probe_if.fault_enable =
+        dut.u_irq_status_ctrl.fault_enable_reg;
+    assign probe_if.fault_code =
+        dut.u_irq_status_ctrl.fault_code_reg;
+    assign probe_if.fault_source =
+        dut.u_irq_status_ctrl.fault_source_reg;
+
+    generate
+        for (genvar probe_channel = 0;
+                probe_channel < DMA_CH_COUNT; probe_channel++) begin : g_probe
+            assign probe_if.cmd_payload[probe_channel] =
+                dut.cmd_payload[probe_channel];
+            // tag_seq_reg still contains the sequence value consumed by the
+            // command accepted in this cycle; the RTL increments it via NBA.
+            assign probe_if.accepted_hw_tag[probe_channel] = {
+                (probe_channel == 1),
+                dut.u_desc_manager.tag_seq_reg[probe_channel]
+            };
+            assign probe_if.completion[probe_channel] =
+                dut.completion[probe_channel];
+        end
+    endgenerate
+
     initial clk = 1'b0;
     always #5 clk = ~clk;
 
@@ -239,6 +301,25 @@ module tb_axi_dma_core_amd_vip;
         if (!$test$plusargs("UVM_TESTNAME")) begin
             $fatal(1, "No UVM test selected; use run_vcs_core_amd_vip.sh or pass +UVM_TESTNAME=<test>");
         end
+
+        vip_cfg = new("vip_cfg");
+        vip_cfg.axil_cpu_vif = u_axil_cpu_vip.inst.IF;
+        vip_cfg.ext_m0_vif   = u_ext_m0_vip.inst.IF;
+        vip_cfg.ext_m1_vif   = u_ext_m1_vip.inst.IF;
+        vip_cfg.mem0_vif     = u_mem0_vip.inst.IF;
+        vip_cfg.mem1_vif     = u_mem1_vip.inst.IF;
+
+        uvm_config_db#(dma_subsys_vip_cfg)::set(
+            null,
+            "uvm_test_top*",
+            "dma_subsys_vip_cfg",
+            vip_cfg);
+        uvm_config_db#(virtual dma_subsys_probe_if)::set(
+            null,
+            "uvm_test_top*",
+            "dma_subsys_probe_vif",
+            probe_if);
+
         run_test();
     end
 endmodule

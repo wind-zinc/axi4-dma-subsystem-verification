@@ -1,0 +1,10 @@
+# Keep the Linux/VCS flow stable on Windows checkouts.
+axi_dma_subsystem_verification/sim/*.sh text eol=lf
+axi_dma_subsystem_verification/sim/*.f text eol=lf
+axi_dma_subsystem_verification/sim/*.cfg text eol=lf
+axi_dma_subsystem_verification/docs/*.md text eol=lf
+axi_dma_subsystem_verification/tb/*.sv text eol=lf
+axi_dma_subsystem_verification/tb/uvm/*.sv text eol=lf
+axi_dma_subsystem_verification/tb/uvm/*.svh text eol=lf
+axi_dma_subsystem_verification/tb/uvm/**/*.sv text eol=lf
+axi_dma_subsystem_verification/tb/uvm/**/*.svh text eol=lf
