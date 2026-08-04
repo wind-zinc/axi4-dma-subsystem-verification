@@ -11,8 +11,14 @@ urg_bin="${URG:-urg}"
 coverage_enabled="${COVERAGE:-1}"
 coverage_metrics="${COVERAGE_METRICS:-line+cond+tgl+fsm+branch+assert}"
 urg_only="${URG_ONLY:-0}"
-urg_metrics="${URG_METRICS:-${coverage_metrics}}"
+# Code coverage is selected explicitly, so add the SystemVerilog functional
+# coverage metric here as well.  Without "group", URG creates an empty Groups
+# page even though the UVM covergroups sampled correctly in simulation.
+urg_metrics="${URG_METRICS:-${coverage_metrics}+group}"
 cm_hier_file="${CM_HIER_FILE:-${project_root}/sim/cm_hier.cfg}"
+compile_only="${COMPILE_ONLY:-0}"
+reuse_compiled_simv="${REUSE_COMPILED_SIMV:-0}"
+skip_urg="${SKIP_URG:-0}"
 
 case "${coverage_enabled}" in
   0|1) ;;
@@ -30,12 +36,48 @@ case "${urg_only}" in
     ;;
 esac
 
+case "${compile_only}" in
+  0|1) ;;
+  *)
+    echo "ERROR: COMPILE_ONLY must be 0 or 1, got '${compile_only}'." >&2
+    exit 2
+    ;;
+esac
+
+case "${reuse_compiled_simv}" in
+  0|1) ;;
+  *)
+    echo "ERROR: REUSE_COMPILED_SIMV must be 0 or 1, got '${reuse_compiled_simv}'." >&2
+    exit 2
+    ;;
+esac
+
+case "${skip_urg}" in
+  0|1) ;;
+  *)
+    echo "ERROR: SKIP_URG must be 0 or 1, got '${skip_urg}'." >&2
+    exit 2
+    ;;
+esac
+
 if [[ -z "${urg_metrics}" ]]; then
   echo "ERROR: URG_METRICS must not be empty." >&2
   exit 2
 fi
 
-default_test="amd_axi_vip_smoke_test"
+# Keep this list synchronized with every concrete test added to
+# tb/uvm/tests and sim/run_core_amd_vip.f.  dma_subsys_base_test is a base
+# class and must not be placed in this regression list.
+regression_tests=(
+  "amd_axi_vip_smoke_test"
+  "dma_subsys_vip_manager_smoke_test"
+  "dma_subsys_env_smoke_test"
+  "dma_subsys_ral_smoke_test"
+  "dma_subsys_ch0_to_ch1_test"
+  "dma_subsys_completion_reorder_test"
+)
+
+vip_smoke_test="amd_axi_vip_smoke_test"
 sim_args=("$@")
 test_name=""
 
@@ -55,13 +97,122 @@ for arg in "$@"; do
 done
 
 if [[ -z "${test_name}" ]]; then
-  test_name="${default_test}"
-  sim_args+=("+UVM_TESTNAME=${test_name}")
-  echo "No +UVM_TESTNAME supplied; defaulting to ${test_name}"
+  if [[ "${urg_only}" == "1" ]]; then
+    echo "ERROR: URG_ONLY=1 requires an explicit +UVM_TESTNAME." >&2
+    echo "Run the default regression without URG_ONLY to generate its merged report." >&2
+    exit 2
+  fi
+  if [[ "${reuse_compiled_simv}" == "1" ]]; then
+    echo "ERROR: REUSE_COMPILED_SIMV=1 requires an explicit +UVM_TESTNAME." >&2
+    exit 2
+  fi
+
+  script_path="${project_root}/sim/$(basename "${BASH_SOURCE[0]}")"
+  regression_stamp="${RUN_STAMP_OVERRIDE:-$(date +%Y%m%d_%H%M%S)}"
+  regression_dir="${REGRESSION_DIR:-${build_dir}/regression/${regression_stamp}}"
+  regression_log_dir="${REGRESSION_LOG_DIR:-${regression_dir}/logs}"
+  regression_cov_dir="${COV_DIR:-${build_dir}/coverage/regression_${regression_stamp}.vdb}"
+  regression_report_dir="${REPORT_DIR:-${build_dir}/coverage/urg_regression_${regression_stamp}}"
+  regression_urg_log="${URG_LOG:-${build_dir}/coverage/urg_regression_${regression_stamp}.log}"
+
+  mkdir -p "${regression_log_dir}"
+
+  echo "No +UVM_TESTNAME supplied; running the maintained regression list."
+  echo "Regression tests (${#regression_tests[@]}):"
+  printf '  %s\n' "${regression_tests[@]}"
+  echo "Compiling once before running the regression..."
+
+  if RUN_STAMP_OVERRIDE="${regression_stamp}" \
+     COV_DIR="${regression_cov_dir}" \
+     COMPILE_ONLY=1 REUSE_COMPILED_SIMV=0 SKIP_URG=1 \
+     "${script_path}" "$@" \
+     "+UVM_TESTNAME=${regression_tests[0]}"; then
+    :
+  else
+    compile_status="$?"
+    echo "ERROR: regression compilation failed with status ${compile_status}." >&2
+    exit "${compile_status}"
+  fi
+
+  if [[ "${compile_only}" == "1" ]]; then
+    echo "Compile-only regression setup complete: ${build_dir}/simv"
+    exit 0
+  fi
+
+  regression_statuses=()
+  regression_failed=0
+
+  for regression_test in "${regression_tests[@]}"; do
+    safe_regression_test="${regression_test//[^[:alnum:]_.-]/_}"
+    regression_sim_log="${regression_log_dir}/sim_${safe_regression_test}.log"
+
+    echo
+    echo "================================================================"
+    echo "REGRESSION TEST: ${regression_test}"
+    echo "================================================================"
+
+    if RUN_STAMP_OVERRIDE="${regression_stamp}" \
+       COV_DIR="${regression_cov_dir}" \
+       SIM_LOG="${regression_sim_log}" \
+       COMPILE_ONLY=0 REUSE_COMPILED_SIMV=1 SKIP_URG=1 \
+       "${script_path}" "$@" \
+       "+UVM_TESTNAME=${regression_test}"; then
+      regression_statuses+=(0)
+    else
+      test_status="$?"
+      regression_statuses+=("${test_status}")
+      regression_failed=1
+    fi
+  done
+
+  regression_urg_status=0
+  if [[ "${coverage_enabled}" == "1" ]]; then
+    echo
+    echo "Generating one cumulative URG report for the regression VDB..."
+    if RUN_STAMP_OVERRIDE="${regression_stamp}" \
+       COV_DIR="${regression_cov_dir}" \
+       REPORT_DIR="${regression_report_dir}" \
+       URG_LOG="${regression_urg_log}" \
+       URG_ONLY=1 COMPILE_ONLY=0 REUSE_COMPILED_SIMV=0 SKIP_URG=0 \
+       "${script_path}" "+UVM_TESTNAME=${regression_tests[0]}"; then
+      :
+    else
+      regression_urg_status="$?"
+      regression_failed=1
+    fi
+  fi
+
+  echo
+  echo "================ REGRESSION SUMMARY ================"
+  for index in "${!regression_tests[@]}"; do
+    if (( regression_statuses[index] == 0 )); then
+      printf 'PASS  %s\n' "${regression_tests[index]}"
+    else
+      printf 'FAIL  %s (status %s)\n' \
+        "${regression_tests[index]}" "${regression_statuses[index]}"
+    fi
+  done
+  echo "Logs: ${regression_log_dir}"
+  if [[ "${coverage_enabled}" == "1" ]]; then
+    echo "Coverage database: ${regression_cov_dir}"
+    if (( regression_urg_status == 0 )); then
+      echo "URG dashboard:     ${regression_report_dir}/dashboard.html"
+    else
+      echo "URG report failed with status ${regression_urg_status}." >&2
+    fi
+  fi
+
+  if (( regression_failed != 0 )); then
+    echo "REGRESSION FAIL: one or more tests/reports failed." >&2
+    exit 1
+  fi
+
+  echo "REGRESSION PASS: all ${#regression_tests[@]} tests passed."
+  exit 0
 fi
 
 safe_test_name="${test_name//[^[:alnum:]_.-]/_}"
-run_stamp="$(date +%Y%m%d_%H%M%S)"
+run_stamp="${RUN_STAMP_OVERRIDE:-$(date +%Y%m%d_%H%M%S)}"
 sim_log="${SIM_LOG:-${build_dir}/sim_${safe_test_name}.log}"
 cov_dir="${COV_DIR:-${build_dir}/coverage/${safe_test_name}_${run_stamp}.vdb}"
 report_dir="${REPORT_DIR:-${build_dir}/coverage/urg_${safe_test_name}_${run_stamp}}"
@@ -92,6 +243,8 @@ run_urg_report() {
 
 run_urg_with_line_fallback() {
   local status
+  local line_group_report_dir
+  local line_group_log
   local line_report_dir
   local line_log
 
@@ -113,12 +266,31 @@ run_urg_with_line_fallback() {
     status="$?"
   fi
 
+  if (( status == 139 )) &&
+     [[ "${urg_metrics}" != "line+group" ]] &&
+     [[ "${urg_metrics}" != "line" ]]; then
+    line_group_report_dir="${report_dir}_line_group"
+    line_group_log="${urg_log}.line_group.log"
+    final_report_dir="${line_group_report_dir}"
+    final_urg_log="${line_group_log}"
+    echo "WARNING: URG crashed with status 139 while reporting '${urg_metrics}'." >&2
+    echo "WARNING: retrying the preserved VDB with line and group coverage." >&2
+    if run_urg_report "line+group" \
+         "${line_group_report_dir}" "${line_group_log}"; then
+      final_report_dir="${line_group_report_dir}"
+      final_urg_log="${line_group_log}"
+      echo "WARNING: the fallback report contains line and group coverage only." >&2
+      return 0
+    else
+      status="$?"
+    fi
+  fi
+
   if (( status == 139 )) && [[ "${urg_metrics}" != "line" ]]; then
     line_report_dir="${report_dir}_line_only"
     line_log="${urg_log}.line_only.log"
     final_report_dir="${line_report_dir}"
     final_urg_log="${line_log}"
-    echo "WARNING: URG crashed with status 139 while reporting '${urg_metrics}'." >&2
     echo "WARNING: retrying the preserved VDB with line coverage only." >&2
     if run_urg_report "line" "${line_report_dir}" "${line_log}"; then
       final_report_dir="${line_report_dir}"
@@ -233,17 +405,26 @@ compile_design() {
     -o "${build_dir}/simv"
 }
 
-if [[ "${coverage_enabled}" == "1" ]]; then
-  compile_design \
-    -cm "${coverage_metrics}" \
-    -cm_noconst \
-    -cm_hier "${cm_hier_file}" \
-    -cm_dir "${cov_dir}"
+if [[ "${reuse_compiled_simv}" == "1" ]]; then
+  if [[ ! -x "${build_dir}/simv" ]]; then
+    echo "ERROR: REUSE_COMPILED_SIMV=1, but no executable simv was found:" >&2
+    echo "       ${build_dir}/simv" >&2
+    exit 2
+  fi
+  echo "Reusing compiled simulator: ${build_dir}/simv"
 else
-  compile_design
+  if [[ "${coverage_enabled}" == "1" ]]; then
+    compile_design \
+      -cm "${coverage_metrics}" \
+      -cm_noconst \
+      -cm_hier "${cm_hier_file}" \
+      -cm_dir "${cov_dir}"
+  else
+    compile_design
+  fi
 fi
 
-if [[ "${COMPILE_ONLY:-0}" == "1" ]]; then
+if [[ "${compile_only}" == "1" ]]; then
   echo "Compile-only mode complete: ${build_dir}/simv"
   if [[ "${coverage_enabled}" == "1" ]]; then
     echo "Coverage instrumentation enabled; run simv before invoking URG."
@@ -289,9 +470,9 @@ if ! grep -Fq "Running test ${test_name}" "${sim_log}"; then
   exit 3
 fi
 
-if [[ "${test_name}" == "${default_test}" ]] &&
+if [[ "${test_name}" == "${vip_smoke_test}" ]] &&
    ! grep -Fq "All five AMD AXI VIP agents passed the first smoke test" "${sim_log}"; then
-  echo "ERROR: ${default_test} started, but its final success marker is missing." >&2
+  echo "ERROR: ${vip_smoke_test} started, but its final success marker is missing." >&2
   exit 4
 fi
 
@@ -308,7 +489,7 @@ fi
 echo "PASS: ${test_name} ran to completion with UVM_ERROR=0 and UVM_FATAL=0."
 echo "PASS evidence: ${sim_log}"
 
-if [[ "${coverage_enabled}" == "1" ]]; then
+if [[ "${coverage_enabled}" == "1" && "${skip_urg}" == "0" ]]; then
   if run_urg_with_line_fallback; then
     urg_status=0
   else
@@ -325,4 +506,6 @@ if [[ "${coverage_enabled}" == "1" ]]; then
   echo "Coverage database: ${cov_dir}"
   echo "URG dashboard:     ${final_report_dir}/dashboard.html"
   echo "URG log:           ${final_urg_log}"
+elif [[ "${coverage_enabled}" == "1" ]]; then
+  echo "URG generation deferred to the regression-level report."
 fi

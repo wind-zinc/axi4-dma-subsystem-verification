@@ -58,7 +58,9 @@ covergroups are retained in the same database. Use `COVERAGE=0` for a fast
 compile/run without coverage, or override `COV_DIR`, `REPORT_DIR`, and
 `COVERAGE_METRICS` when a fixed artifact path or metric set is required.
 
-The default metrics are `line+cond+tgl+fsm+branch+assert`. The hierarchy
+The default VCS code metrics are `line+cond+tgl+fsm+branch+assert`; URG also
+requests the `group` metric so that the UVM functional covergroups appear as
+separate entries in the report. The hierarchy
 configuration excludes structural code coverage for the imported
 `verilog-axi`, `verilog-axis`, arbiter, and priority-encoder modules. Their
 behavior remains checked through subsystem transactions and AMD AXI VIP,
@@ -67,9 +69,11 @@ DMA subsystem RTL. This boundary also avoids a VCS/URG V-2023.12-SP2 crash
 observed while loading the complete parameterized vendor line-shape data.
 Do not reuse a VDB that URG has already reported as corrupted.
 
-The launcher defaults to `amd_axi_vip_smoke_test` whenever no
-`+UVM_TESTNAME` argument is supplied. A simulation is never intentionally
-started with inactive VIP agents.
+When no `+UVM_TESTNAME` argument is supplied, the launcher compiles once,
+runs every concrete test in its maintained `regression_tests` list into one
+coverage database, and then generates one cumulative URG report. Supplying
+`+UVM_TESTNAME=<name>` still runs only the selected test. A simulation is
+never intentionally started with inactive VIP agents.
 
 The previous RAM-backed smoke test and its file lists have been removed from
 the active verification flow. `axi_dma_subsystem_ram_top.sv` and

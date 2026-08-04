@@ -46,5 +46,7 @@
 ../tb/tb_axi_dma_core_amd_vip.sv
 ../tb/uvm/tests/dma_subsys_vip_manager_smoke_test.sv
 ../tb/uvm/tests/dma_subsys_env_smoke_test.sv
+../tb/uvm/tests/dma_subsys_ral_smoke_test.sv
 ../tb/uvm/tests/dma_subsys_ch0_to_ch1_test.sv
+../tb/uvm/tests/dma_subsys_completion_reorder_test.sv
 ../tb/uvm/tests/amd_axi_vip_smoke_test.sv

@@ -36,7 +36,9 @@ package dma_subsys_env_pkg;
     `include "dma_subsys_watchdog.svh"
     `include "dma_subsys_virtual_sequencer.svh"
     `include "dma_subsys_vseq_base.svh"
+    `include "dma_subsys_ral_smoke_vseq.svh"
     `include "dma_subsys_ch0_to_ch1_vseq.svh"
+    `include "dma_subsys_completion_reorder_vseq.svh"
     `include "dma_subsys_env.svh"
     `include "dma_subsys_base_test.svh"
 
