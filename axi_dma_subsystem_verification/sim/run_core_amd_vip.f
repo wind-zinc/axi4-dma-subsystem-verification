@@ -7,11 +7,13 @@
 +incdir+../tb/uvm/env
 +incdir+../tb/uvm/env/seq_lib
 +incdir+../tb/uvm/tests
++incdir+../tb/sva
 
 ../rtl/dma_subsystem_pkg.sv
 ../tb/uvm/common/dma_subsys_tr_pkg.sv
 ../tb/uvm/agents/amd_axi_vip/dma_subsys_vip_pkg.sv
 ../tb/uvm/agents/dma_subsys_probe/dma_subsys_probe_if.sv
+../tb/uvm/common/dma_subsys_test_ctrl_if.sv
 ../tb/uvm/env/dma_subsys_env_pkg.sv
 
 ../rtl/vendor/common/priority_encoder.v
@@ -43,10 +45,24 @@
 ../rtl/dma_irq_status_ctrl.sv
 ../rtl/axi_dma_subsystem_core.sv
 
+../tb/sva/dma_subsys_axi_sva.sv
 ../tb/tb_axi_dma_core_amd_vip.sv
 ../tb/uvm/tests/dma_subsys_vip_manager_smoke_test.sv
 ../tb/uvm/tests/dma_subsys_env_smoke_test.sv
 ../tb/uvm/tests/dma_subsys_ral_smoke_test.sv
 ../tb/uvm/tests/dma_subsys_ch0_to_ch1_test.sv
 ../tb/uvm/tests/dma_subsys_completion_reorder_test.sv
+../tb/uvm/tests/dma_subsys_ch1_to_ch0_test.sv
+../tb/uvm/tests/dma_subsys_crossbar_path_matrix_test.sv
+../tb/uvm/tests/dma_subsys_transfer_length_boundary_test.sv
+../tb/uvm/tests/dma_subsys_register_access_policy_test.sv
+../tb/uvm/tests/dma_subsys_axi_burst_shape_test.sv
+../tb/uvm/tests/dma_subsys_route_contention_test.sv
+../tb/uvm/tests/dma_subsys_completion_order_reverse_test.sv
+../tb/uvm/tests/dma_subsys_irq_mask_multi_pending_test.sv
+../tb/uvm/tests/dma_subsys_descriptor_error_test.sv
+../tb/uvm/tests/dma_subsys_abort_timing_test.sv
+../tb/uvm/tests/dma_subsys_reset_recovery_test.sv
+../tb/uvm/tests/dma_subsys_memory_response_error_test.sv
+../tb/uvm/tests/dma_subsys_status_fault_injection_test.sv
 ../tb/uvm/tests/amd_axi_vip_smoke_test.sv

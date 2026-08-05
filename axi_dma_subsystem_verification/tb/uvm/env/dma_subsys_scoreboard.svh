@@ -175,8 +175,16 @@ class dma_subsys_scoreboard extends uvm_component;
         copy.copy(tr);
         copy.record_kind = DMA_RECORD_INTENT;
         copy.ensure_flow_id();
-        pending_intents.push_back(copy);
         intent_count++;
+
+        // Rejected software requests (disabled/busy) never cross the
+        // cmd_valid/cmd_ready observation point, so there is deliberately no
+        // DMA_CMD_ACCEPTED transaction for them.  They still belong in
+        // functional coverage, but must not remain as unmatched scoreboard
+        // work at end of test.
+        if (copy.expect_accept) begin
+            pending_intents.push_back(copy);
+        end
     endfunction
 
     virtual function void write_cmd(input dma_subsys_cmd_tr tr);

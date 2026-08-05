@@ -8,6 +8,7 @@ class dma_subsys_virtual_sequencer extends uvm_sequencer #(
     dma_subsys_reg_block ral;
     dma_subsys_env_cfg cfg;
     virtual dma_subsys_probe_if probe_vif;
+    virtual dma_subsys_test_ctrl_if test_ctrl_vif;
     uvm_analysis_port #(dma_subsys_cmd_tr) intent_ap;
 
     function new(
@@ -25,6 +26,12 @@ class dma_subsys_virtual_sequencer extends uvm_sequencer #(
             `uvm_fatal(
                 "VSEQR_PROBE_VIF",
                 "Virtual sequencer did not receive dma_subsys_probe_vif")
+        end
+        if (!uvm_config_db#(virtual dma_subsys_test_ctrl_if)::get(
+                this, "", "dma_subsys_test_ctrl_vif", test_ctrl_vif)) begin
+            `uvm_fatal(
+                "VSEQR_TEST_CTRL_VIF",
+                "Virtual sequencer did not receive dma_subsys_test_ctrl_vif")
         end
     endfunction
 

@@ -11,7 +11,11 @@ module tb_axi_dma_core_amd_vip;
     `include "uvm_macros.svh"
 
     logic clk;
-    logic rst;
+    logic boot_reset;
+    dma_subsys_test_ctrl_if test_ctrl_if (
+        .clk(clk)
+    );
+    wire rst = boot_reset | test_ctrl_if.reset_request;
     wire aresetn = ~rst;
 
     logic [AXIL_ADDR_WIDTH-1:0] s_axil_awaddr;
@@ -227,6 +231,58 @@ module tb_axi_dma_core_amd_vip;
         .s_axi_rlast(m_axi_mem_rlast[1]), .s_axi_rvalid(m_axi_mem_rvalid[1]), .s_axi_rready(m_axi_mem_rready[1])
     );
 
+    generate
+        for (genvar sva_memory = 0;
+                sva_memory < AXI_SLAVE_COUNT; sva_memory++) begin : g_axi_sva
+            dma_subsys_axi_sva #(
+                .ADDR_WIDTH(AXI_ADDR_WIDTH),
+                .DATA_WIDTH(AXI_DATA_WIDTH),
+                .ID_WIDTH(AXI_XBAR_M_ID_WIDTH)
+            ) u_axi_sva (
+                .clk(clk),
+                .aresetn(aresetn),
+                .awid(m_axi_mem_awid[
+                    sva_memory*AXI_XBAR_M_ID_WIDTH +: AXI_XBAR_M_ID_WIDTH]),
+                .awaddr(m_axi_mem_awaddr[
+                    sva_memory*AXI_ADDR_WIDTH +: AXI_ADDR_WIDTH]),
+                .awlen(m_axi_mem_awlen[sva_memory*8 +: 8]),
+                .awsize(m_axi_mem_awsize[sva_memory*3 +: 3]),
+                .awburst(m_axi_mem_awburst[sva_memory*2 +: 2]),
+                .awvalid(m_axi_mem_awvalid[sva_memory]),
+                .awready(m_axi_mem_awready[sva_memory]),
+                .wdata(m_axi_mem_wdata[
+                    sva_memory*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]),
+                .wstrb(m_axi_mem_wstrb[
+                    sva_memory*AXI_STRB_WIDTH +: AXI_STRB_WIDTH]),
+                .wlast(m_axi_mem_wlast[sva_memory]),
+                .wvalid(m_axi_mem_wvalid[sva_memory]),
+                .wready(m_axi_mem_wready[sva_memory]),
+                .bid(m_axi_mem_bid[
+                    sva_memory*AXI_XBAR_M_ID_WIDTH +: AXI_XBAR_M_ID_WIDTH]),
+                .bresp(m_axi_mem_bresp[sva_memory*2 +: 2]),
+                .bvalid(m_axi_mem_bvalid[sva_memory]),
+                .bready(m_axi_mem_bready[sva_memory]),
+                .arid(m_axi_mem_arid[
+                    sva_memory*AXI_XBAR_M_ID_WIDTH +: AXI_XBAR_M_ID_WIDTH]),
+                .araddr(m_axi_mem_araddr[
+                    sva_memory*AXI_ADDR_WIDTH +: AXI_ADDR_WIDTH]),
+                .arlen(m_axi_mem_arlen[sva_memory*8 +: 8]),
+                .arsize(m_axi_mem_arsize[sva_memory*3 +: 3]),
+                .arburst(m_axi_mem_arburst[sva_memory*2 +: 2]),
+                .arvalid(m_axi_mem_arvalid[sva_memory]),
+                .arready(m_axi_mem_arready[sva_memory]),
+                .rid(m_axi_mem_rid[
+                    sva_memory*AXI_XBAR_M_ID_WIDTH +: AXI_XBAR_M_ID_WIDTH]),
+                .rdata(m_axi_mem_rdata[
+                    sva_memory*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]),
+                .rresp(m_axi_mem_rresp[sva_memory*2 +: 2]),
+                .rlast(m_axi_mem_rlast[sva_memory]),
+                .rvalid(m_axi_mem_rvalid[sva_memory]),
+                .rready(m_axi_mem_rready[sva_memory])
+            );
+        end
+    endgenerate
+
     // Small passive observation surface for system-level UVM monitors.
     // Only the static testbench knows DUT hierarchy; package classes receive
     // this interface through uvm_config_db.
@@ -283,15 +339,153 @@ module tb_axi_dma_core_amd_vip;
         end
     endgenerate
 
+    // Test-only fault hooks.  UVM classes manipulate only test_ctrl_if; this
+    // static module is the sole owner of hierarchy references and force/
+    // release statements.  Every hook is disabled by default.
+    always @(*) begin
+        if (test_ctrl_if.force_axil_wstrb_enable) begin
+            force s_axil_wstrb = test_ctrl_if.forced_axil_wstrb;
+        end else begin
+            release s_axil_wstrb;
+        end
+    end
+
+    generate
+        for (genvar inject_master = 0;
+                inject_master < EXT_AXI_MASTER_COUNT;
+                inject_master++) begin : g_ext_strobe_injection
+            always @(*) begin
+                if (test_ctrl_if.force_ext_wstrb_zero[inject_master]) begin
+                    force s_axi_ext_wstrb[
+                        inject_master*AXI_STRB_WIDTH +: AXI_STRB_WIDTH] = '0;
+                end else begin
+                    release s_axi_ext_wstrb[
+                        inject_master*AXI_STRB_WIDTH +: AXI_STRB_WIDTH];
+                end
+            end
+        end
+
+        for (genvar inject_memory = 0;
+                inject_memory < AXI_SLAVE_COUNT;
+                inject_memory++) begin : g_mem_response_injection
+            always @(*) begin
+                if (test_ctrl_if.force_bresp_enable[inject_memory]) begin
+                    force m_axi_mem_bresp[inject_memory*2 +: 2] =
+                        test_ctrl_if.forced_bresp[inject_memory];
+                end else begin
+                    release m_axi_mem_bresp[inject_memory*2 +: 2];
+                end
+            end
+            always @(*) begin
+                if (test_ctrl_if.force_rresp_enable[inject_memory]) begin
+                    force m_axi_mem_rresp[inject_memory*2 +: 2] =
+                        test_ctrl_if.forced_rresp[inject_memory];
+                end else begin
+                    release m_axi_mem_rresp[inject_memory*2 +: 2];
+                end
+            end
+        end
+
+        for (genvar inject_channel = 0;
+                inject_channel < DMA_CH_COUNT;
+                inject_channel++) begin : g_manager_injection
+            always @(*) begin
+                if (test_ctrl_if.corrupt_rd_tag_enable[inject_channel]
+                        || test_ctrl_if.force_rd_status_valid[
+                            inject_channel]) begin
+                    force dut.rd_status_tag[inject_channel] =
+                        test_ctrl_if.forced_rd_tag[inject_channel];
+                end else begin
+                    release dut.rd_status_tag[inject_channel];
+                end
+            end
+            always @(*) begin
+                if (test_ctrl_if.corrupt_wr_tag_enable[inject_channel]
+                        || test_ctrl_if.force_wr_status_valid[
+                            inject_channel]) begin
+                    force dut.wr_status_tag[inject_channel] =
+                        test_ctrl_if.forced_wr_tag[inject_channel];
+                end else begin
+                    release dut.wr_status_tag[inject_channel];
+                end
+            end
+            always @(*) begin
+                if (test_ctrl_if.corrupt_wr_len_enable[inject_channel]
+                        || test_ctrl_if.force_wr_status_valid[
+                            inject_channel]) begin
+                    force dut.wr_status_len[inject_channel] =
+                        test_ctrl_if.forced_wr_len[inject_channel];
+                end else begin
+                    release dut.wr_status_len[inject_channel];
+                end
+            end
+            always @(*) begin
+                if (test_ctrl_if.force_rd_status_valid[inject_channel]) begin
+                    force dut.rd_status_valid[inject_channel] = 1'b1;
+                    force dut.rd_status_error[inject_channel] =
+                        test_ctrl_if.forced_status_error[inject_channel];
+                end else begin
+                    release dut.rd_status_valid[inject_channel];
+                    release dut.rd_status_error[inject_channel];
+                end
+            end
+            always @(*) begin
+                if (test_ctrl_if.force_wr_status_valid[inject_channel]) begin
+                    force dut.wr_status_valid[inject_channel] = 1'b1;
+                    force dut.wr_status_error[inject_channel] =
+                        test_ctrl_if.forced_status_error[inject_channel];
+                end else begin
+                    release dut.wr_status_valid[inject_channel];
+                    release dut.wr_status_error[inject_channel];
+                end
+            end
+            always @(*) begin
+                if (test_ctrl_if.force_cmd_reg_src_enable[
+                        inject_channel]) begin
+                    force dut.u_desc_manager.cmd_reg[
+                        inject_channel].src_ch =
+                        test_ctrl_if.forced_cmd_reg_src[inject_channel];
+                end else begin
+                    release dut.u_desc_manager.cmd_reg[
+                        inject_channel].src_ch;
+                end
+            end
+            always @(*) begin
+                if (test_ctrl_if.force_route_src_enable[inject_channel]) begin
+                    force dut.route_req_src[inject_channel] =
+                        test_ctrl_if.forced_route_src[inject_channel];
+                end else begin
+                    release dut.route_req_src[inject_channel];
+                end
+            end
+            always @(*) begin
+                if (test_ctrl_if.force_route_ready_low[inject_channel]) begin
+                    force dut.route_req_ready[inject_channel] = 1'b0;
+                end else begin
+                    release dut.route_req_ready[inject_channel];
+                end
+            end
+            always @(*) begin
+                if (test_ctrl_if.force_manager_state_enable[
+                        inject_channel]) begin
+                    force dut.u_desc_manager.state_reg[inject_channel] =
+                        test_ctrl_if.forced_manager_state[inject_channel];
+                end else begin
+                    release dut.u_desc_manager.state_reg[inject_channel];
+                end
+            end
+        end
+    endgenerate
+
     initial clk = 1'b0;
     always #5 clk = ~clk;
 
     initial begin
-        rst = 1'b1;
+        boot_reset = 1'b1;
         // AMD AXI VIP checks for at least 16 active reset clock cycles.
         // Keep a margin so every one of the five agents starts cleanly.
         repeat (20) @(posedge clk);
-        rst = 1'b0;
+        boot_reset = 1'b0;
     end
 
     // Every simulation must start a UVM test so all five generated VIP
@@ -319,6 +513,11 @@ module tb_axi_dma_core_amd_vip;
             "uvm_test_top*",
             "dma_subsys_probe_vif",
             probe_if);
+        uvm_config_db#(virtual dma_subsys_test_ctrl_if)::set(
+            null,
+            "uvm_test_top*",
+            "dma_subsys_test_ctrl_vif",
+            test_ctrl_if);
 
         run_test();
     end

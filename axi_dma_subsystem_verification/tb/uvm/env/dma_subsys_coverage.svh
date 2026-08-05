@@ -169,7 +169,11 @@ class dma_subsys_coverage extends uvm_component;
             ignore_bins unknown = {DMA_CH_UNKNOWN};
         }
         cp_length: coverpoint length {
-            illegal_bins zero = {0};
+            // The register block accepts the request into the manager first;
+            // descriptor validation then completes it with LEN_ZERO.  It is
+            // therefore an observed accepted-command case, not a protocol
+            // violation of this covergroup.
+            bins zero = {0};
             bins sub_beat = {[1:3]};
             bins one_beat = {4};
             bins short = {[5:16]};
