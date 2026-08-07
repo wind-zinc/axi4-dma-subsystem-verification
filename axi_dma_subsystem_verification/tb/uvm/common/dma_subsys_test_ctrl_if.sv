@@ -15,7 +15,41 @@ interface dma_subsys_test_ctrl_if(input logic clk);
 
     logic force_axil_wstrb_enable;
     logic [AXIL_STRB_WIDTH-1:0] forced_axil_wstrb;
+    logic hold_axil_b_channel;
+    logic hold_axil_r_channel;
     logic [EXT_AXI_MASTER_COUNT-1:0] force_ext_wstrb_zero;
+
+    // Read-only AXI-Lite observations used by timing-directed sequences.
+    logic axil_awvalid_observed;
+    logic axil_awready_observed;
+    logic axil_wvalid_observed;
+    logic axil_wready_observed;
+    logic axil_bvalid_observed;
+    logic axil_bready_observed;
+    logic [1:0] axil_bresp_observed;
+    logic axil_arvalid_observed;
+    logic axil_arready_observed;
+    logic axil_rvalid_observed;
+    logic axil_rready_observed;
+    logic [1:0] axil_rresp_observed;
+
+    // Sample immediately before each rising edge so timing checkers observe
+    // the handshake that belongs to that edge, not a post-edge VIP update.
+    clocking axil_mon_cb @(posedge clk);
+        default input #1step;
+        input axil_awvalid_observed;
+        input axil_awready_observed;
+        input axil_wvalid_observed;
+        input axil_wready_observed;
+        input axil_bvalid_observed;
+        input axil_bready_observed;
+        input axil_bresp_observed;
+        input axil_arvalid_observed;
+        input axil_arready_observed;
+        input axil_rvalid_observed;
+        input axil_rready_observed;
+        input axil_rresp_observed;
+    endclocking
 
     logic [DMA_CH_COUNT-1:0] corrupt_rd_tag_enable;
     logic [DMA_CH_COUNT-1:0][TAG_WIDTH-1:0] forced_rd_tag;
@@ -44,6 +78,8 @@ interface dma_subsys_test_ctrl_if(input logic clk);
         forced_rresp = '0;
         force_axil_wstrb_enable = 1'b0;
         forced_axil_wstrb = '1;
+        hold_axil_b_channel = 1'b0;
+        hold_axil_r_channel = 1'b0;
         force_ext_wstrb_zero = '0;
         corrupt_rd_tag_enable = '0;
         forced_rd_tag = '0;

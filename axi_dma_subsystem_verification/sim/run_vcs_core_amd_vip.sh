@@ -88,6 +88,11 @@ regression_tests=(
   "dma_subsys_reset_recovery_test"
   "dma_subsys_memory_response_error_test"
   "dma_subsys_status_fault_injection_test"
+  "dma_subsys_axil_protocol_timing_test"
+  "dma_subsys_irq_status_separation_test"
+  "dma_subsys_status_fault_expansion_test"
+  "dma_subsys_abort_phase_matrix_test"
+  "dma_subsys_toggle_value_sweep_test"
 )
 
 vip_smoke_test="amd_axi_vip_smoke_test"

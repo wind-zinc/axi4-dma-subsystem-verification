@@ -52,6 +52,11 @@ package dma_subsys_env_pkg;
     `include "dma_subsys_reset_recovery_vseq.svh"
     `include "dma_subsys_memory_response_error_vseq.svh"
     `include "dma_subsys_status_fault_injection_vseq.svh"
+    `include "dma_subsys_axil_protocol_timing_vseq.svh"
+    `include "dma_subsys_irq_status_separation_vseq.svh"
+    `include "dma_subsys_status_fault_expansion_vseq.svh"
+    `include "dma_subsys_abort_phase_matrix_vseq.svh"
+    `include "dma_subsys_toggle_value_sweep_vseq.svh"
     `include "dma_subsys_env.svh"
     `include "dma_subsys_base_test.svh"
 
