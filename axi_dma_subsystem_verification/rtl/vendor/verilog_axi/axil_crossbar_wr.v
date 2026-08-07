@@ -294,10 +294,13 @@ generate
 
         assign m_wc_ready = !w_select_valid_reg;
 
+        // A W transfer is valid only while a decoded write command is active.
+        wire w_handshake = w_select_valid_reg && int_s_axil_wvalid[m] && int_s_axil_wready[m];
+
         always @* begin
             w_select_next = w_select_reg;
-            w_drop_next = w_drop_reg && !(int_s_axil_wvalid[m] && int_s_axil_wready[m]);
-            w_select_valid_next = w_select_valid_reg && !(int_s_axil_wvalid[m] && int_s_axil_wready[m]);
+            w_drop_next = w_drop_reg && !w_handshake;
+            w_select_valid_next = w_select_valid_reg && !w_handshake;
 
             if (m_wc_valid && !w_select_valid_reg) begin
                 w_select_next = m_wc_select;
@@ -308,18 +311,19 @@ generate
 
         always @(posedge clk) begin
             if (rst) begin
+                w_select_reg <= 0;
+                w_drop_reg <= 1'b0;
                 w_select_valid_reg <= 1'b0;
             end else begin
+                w_select_reg <= w_select_next;
+                w_drop_reg <= w_drop_next;
                 w_select_valid_reg <= w_select_valid_next;
             end
-
-            w_select_reg <= w_select_next;
-            w_drop_reg <= w_drop_next;
         end
 
         // write data forwarding
         assign int_axil_wvalid[m*M_COUNT +: M_COUNT] = (int_s_axil_wvalid[m] && w_select_valid_reg && !w_drop_reg) << w_select_reg;
-        assign int_s_axil_wready[m] = int_axil_wready[w_select_reg*S_COUNT+m] || w_drop_reg;
+        assign int_s_axil_wready[m] = w_select_valid_reg && (int_axil_wready[w_select_reg*S_COUNT+m] || w_drop_reg);
 
         // response handling
         assign fifo_wr_select = m_rc_select;
@@ -332,14 +336,54 @@ generate
         wire b_decerr = fifo_rd_decerr_reg;
         wire b_valid = fifo_rd_valid_reg;
 
+        // Count completed DECERR W transfers whose local B responses have not
+        // left the response FIFO.  AXI-Lite has one ordered W beat per write,
+        // so a nonzero count proves that the head DECERR has completed W.
+        reg [FIFO_ADDR_WIDTH:0] decerr_w_credit_count_reg;
+        wire decerr_w_credit_push = w_handshake && w_drop_reg;
+        wire decerr_w_credit_pop = fifo_rd_en && b_decerr;
+        wire decerr_w_credit_available = |decerr_w_credit_count_reg;
+
+        always @(posedge clk) begin
+            if (rst) begin
+                decerr_w_credit_count_reg <= 0;
+            end else begin
+                case ({decerr_w_credit_push, decerr_w_credit_pop})
+                    2'b10: decerr_w_credit_count_reg <= decerr_w_credit_count_reg + 1;
+                    2'b01: decerr_w_credit_count_reg <= decerr_w_credit_count_reg - 1;
+                    default: decerr_w_credit_count_reg <= decerr_w_credit_count_reg;
+                endcase
+            end
+        end
+
         // write response mux
         wire [1:0]  m_axil_bresp_mux  = b_decerr ? 2'b11 : int_m_axil_bresp[b_select*2 +: 2];
-        wire        m_axil_bvalid_mux = (b_decerr ? 1'b1 : int_axil_bvalid[b_select*S_COUNT+m]) && b_valid;
+        wire        m_axil_bvalid_mux = (b_decerr ? decerr_w_credit_available : int_axil_bvalid[b_select*S_COUNT+m]) && b_valid;
         wire        m_axil_bready_mux;
 
-        assign int_axil_bready[m*M_COUNT +: M_COUNT] = (b_valid && m_axil_bready_mux) << b_select;
+        // DECERR is generated locally and must never consume a real M-side B.
+        assign int_axil_bready[m*M_COUNT +: M_COUNT] = (b_valid && !b_decerr && m_axil_bready_mux) << b_select;
 
         assign fifo_rd_en = m_axil_bvalid_mux && m_axil_bready_mux && b_valid;
+
+        // synthesis translate_off
+        always @(posedge clk) begin
+            if (!rst) begin
+                if (decerr_w_credit_pop && !decerr_w_credit_push && !decerr_w_credit_available) begin
+                    $error("Error: DECERR W-credit underflow (instance %m)");
+                end
+                if (decerr_w_credit_push && !decerr_w_credit_pop && &decerr_w_credit_count_reg) begin
+                    $error("Error: DECERR W-credit overflow (instance %m)");
+                end
+                if (w_drop_reg && !w_select_valid_reg) begin
+                    $error("Error: write-drop state without a valid command (instance %m)");
+                end
+                if (b_decerr && |int_axil_bready[m*M_COUNT +: M_COUNT]) begin
+                    $error("Error: downstream BREADY asserted for a local DECERR (instance %m)");
+                end
+            end
+        end
+        // synthesis translate_on
 
         // S side register
         axil_register_wr #(
