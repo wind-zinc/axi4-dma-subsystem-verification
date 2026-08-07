@@ -27,6 +27,25 @@ class dma_subsys_register_access_policy_vseq extends dma_subsys_vseq_base;
         expect_axil_response(response, expected, operation);
     endtask
 
+    protected task read_data_expect(
+        input logic [AXIL_ADDR_WIDTH-1:0] address,
+        input logic [31:0] expected_value,
+        input string operation
+    );
+        logic [31:0] value;
+        xil_axi_resp_t response;
+
+        axil_read32_raw(address, value, response, operation);
+        expect_axil_response(response, XIL_AXI_RESP_OKAY, operation);
+        if (value !== expected_value) begin
+            `uvm_error(
+                "REGISTER_WSTRB_DATA",
+                $sformatf(
+                    "%s expected data=0x%08h, observed=0x%08h",
+                    operation, expected_value, value))
+        end
+    endtask
+
     virtual task body();
         logic [11:0] channel_offsets[13];
         logic [11:0] global_offsets[11];
@@ -94,9 +113,17 @@ class dma_subsys_register_access_policy_vseq extends dma_subsys_vseq_base;
         p_sequencer.test_ctrl_vif.forced_axil_wstrb = 4'b0011;
         write_expect(CH0_CTRL_BASE_ADDR + REG_SRC_ADDR,
             32'hABCD_5678, XIL_AXI_RESP_OKAY, "partial-strobe write");
+        // Keep the override stable until the passive adapter has consumed
+        // the completed VIP monitor transaction.
+        wait_probe_cycles(2);
+        read_data_expect(CH0_CTRL_BASE_ADDR + REG_SRC_ADDR,
+            32'h0000_5678, "verify partial-strobe byte merge");
         p_sequencer.test_ctrl_vif.forced_axil_wstrb = 4'b0000;
         write_expect(CH0_CTRL_BASE_ADDR + REG_SRC_ADDR,
             32'hFFFF_FFFF, XIL_AXI_RESP_OKAY, "zero-strobe write");
+        wait_probe_cycles(2);
+        read_data_expect(CH0_CTRL_BASE_ADDR + REG_SRC_ADDR,
+            32'h0000_5678, "verify zero-strobe write has no effect");
         p_sequencer.test_ctrl_vif.force_axil_wstrb_enable = 1'b0;
 
         wait_probe_cycles(5);

@@ -4,6 +4,7 @@ class dma_subsys_vip_transaction_adapter extends uvm_component;
     `uvm_component_utils(dma_subsys_vip_transaction_adapter)
 
     dma_subsys_vip_manager vip_mgr;
+    virtual dma_subsys_test_ctrl_if test_ctrl_vif;
 
     uvm_analysis_port #(dma_subsys_reg_tr) reg_ap;
     uvm_analysis_port #(dma_subsys_mem_tr) mem_ap;
@@ -15,6 +16,16 @@ class dma_subsys_vip_transaction_adapter extends uvm_component;
         super.new(name, parent);
         reg_ap = new("reg_ap", this);
         mem_ap = new("mem_ap", this);
+    endfunction
+
+    virtual function void build_phase(uvm_phase phase);
+        super.build_phase(phase);
+        if (!uvm_config_db#(virtual dma_subsys_test_ctrl_if)::get(
+                this, "", "dma_subsys_test_ctrl_vif", test_ctrl_vif)) begin
+            `uvm_fatal(
+                "VIP_ADAPTER_CTRL_VIF",
+                "VIP adapter did not receive dma_subsys_test_ctrl_vif")
+        end
     endfunction
 
     protected function dma_axi_resp_e normalize_resp(
@@ -40,6 +51,18 @@ class dma_subsys_vip_transaction_adapter extends uvm_component;
         endcase
     endfunction
 
+    protected function dma_axi_resp_e normalize_resp_bits(
+        input logic [1:0] response
+    );
+        case (response)
+            2'b00:   return DMA_AXI_OKAY;
+            2'b01:   return DMA_AXI_EXOKAY;
+            2'b10:   return DMA_AXI_SLVERR;
+            2'b11:   return DMA_AXI_DECERR;
+            default: return DMA_AXI_DECERR;
+        endcase
+    endfunction
+
     protected function dma_subsys_reg_tr convert_register(
         input axi_monitor_transaction raw
     );
@@ -59,8 +82,15 @@ class dma_subsys_vip_transaction_adapter extends uvm_component;
 
         if (raw.get_cmd_type() == XIL_AXI_WRITE) begin
             tr.access = DMA_ACCESS_WRITE;
-            strb_beat = raw.get_strb_beat(0);
-            tr.strb = strb_beat[AXIL_STRB_WIDTH-1:0];
+            // A top-level force shapes the DUT-facing WSTRB after the AMD
+            // master has created its transaction object.  In that directed
+            // case the raw object still contains the pre-force full strobe.
+            if (test_ctrl_vif.force_axil_wstrb_enable) begin
+                tr.strb = test_ctrl_vif.forced_axil_wstrb;
+            end else begin
+                strb_beat = raw.get_strb_beat(0);
+                tr.strb = strb_beat[AXIL_STRB_WIDTH-1:0];
+            end
             tr.resp = normalize_resp(raw.get_bresp());
         end else begin
             tr.access = DMA_ACCESS_READ;
@@ -104,12 +134,14 @@ class dma_subsys_vip_transaction_adapter extends uvm_component;
         xil_axi_strb_beat strb_beat;
         xil_axi_ulong address;
         int unsigned flat_index;
+        int unsigned memory_index;
 
         tr = dma_subsys_mem_tr::type_id::create("normalized_mem");
         tr.record_kind = DMA_RECORD_OBSERVED;
         tr.access = (raw.get_cmd_type() == XIL_AXI_WRITE)
             ? DMA_ACCESS_WRITE : DMA_ACCESS_READ;
         tr.target = target;
+        memory_index = (target == DMA_MEM_RAM1) ? 1 : 0;
         tr.burst = normalize_burst(raw.get_burst());
         tr.axi_id = raw.get_id();
         address = raw.get_addr();
@@ -144,9 +176,21 @@ class dma_subsys_vip_transaction_adapter extends uvm_component;
         end
 
         if (tr.access == DMA_ACCESS_WRITE) begin
-            tr.resp = normalize_resp(raw.get_bresp());
+            // The memory VIP slave creates its monitor object before the
+            // top-level response force is applied at the DUT boundary.
+            if (test_ctrl_vif.force_bresp_enable[memory_index]) begin
+                tr.resp = normalize_resp_bits(
+                    test_ctrl_vif.forced_bresp[memory_index]);
+            end else begin
+                tr.resp = normalize_resp(raw.get_bresp());
+            end
         end else begin
-            tr.resp = aggregate_read_response(raw);
+            if (test_ctrl_vif.force_rresp_enable[memory_index]) begin
+                tr.resp = normalize_resp_bits(
+                    test_ctrl_vif.forced_rresp[memory_index]);
+            end else begin
+                tr.resp = aggregate_read_response(raw);
+            end
         end
         tr.transaction_done = 1'b1;
         tr.normalize();

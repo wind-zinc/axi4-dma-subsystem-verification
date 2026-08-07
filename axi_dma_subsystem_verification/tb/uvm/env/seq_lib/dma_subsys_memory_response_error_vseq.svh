@@ -38,6 +38,9 @@ class dma_subsys_memory_response_error_vseq extends dma_subsys_vseq_base;
             1'b1, 1'b1, 1'b0, 1'b0,
             $sformatf("start %s", case_name));
         check_channel_error(source_ch, expected_error, 1'b0, case_name);
+        // Hold the forced response through passive VIP normalization.  The
+        // AMD slave monitor object itself retains its pre-force response.
+        wait_probe_cycles(2);
         if (write_side) begin
             p_sequencer.test_ctrl_vif.force_bresp_enable[
                 memory_index] = 1'b0;

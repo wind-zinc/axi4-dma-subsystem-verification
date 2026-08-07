@@ -38,7 +38,10 @@ class dma_subsys_irq_monitor extends dma_subsys_probe_monitor_base;
     protected function void publish_reset(input bit reset_n);
         dma_subsys_reset_tr tr;
 
-        if (!reset_n) begin
+        // Epoch zero belongs to the power-on reset.  Increment only when a
+        // later assertion starts a new reset episode, so assertion and
+        // deassertion of the same episode keep the same epoch number.
+        if (!reset_n && initialized) begin
             reset_epoch++;
         end
         tr = dma_subsys_reset_tr::type_id::create("reset_event");

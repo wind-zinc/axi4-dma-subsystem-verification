@@ -98,6 +98,23 @@ class dma_subsys_irq_mask_multi_pending_vseq extends dma_subsys_vseq_base;
             `uvm_error("IRQ_MASK_ERROR", "masked error caused global IRQ")
         end
 
+        // Unmask only the two pending error causes.  Keeping done and fault
+        // disabled creates enabled_cause.error_only before the multi-cause
+        // case below.
+        axil_write32(GLOBAL_IRQ_BASE_ADDR + REG_IRQ_ENABLE,
+            32'h0000_0300, "unmask pending errors only");
+        wait_probe_cycles(2);
+        axil_read32(GLOBAL_IRQ_BASE_ADDR + REG_IRQ_STATUS,
+            irq_status, "read error-only IRQ status");
+        if ((irq_status[9:8] != 2'b11)
+                || (irq_status[1:0] != 2'b11)
+                || irq_status[30]
+                || !p_sequencer.probe_vif.mon_cb.global_irq) begin
+            `uvm_error("IRQ_ERROR_ONLY",
+                $sformatf("unexpected error-only IRQ status=0x%08h",
+                          irq_status))
+        end
+
         // Add a masked manager fault, then enable error+fault together.  This
         // closes masked_pending and enabled_cause.multiple.
         p_sequencer.test_ctrl_vif.pulse_unexpected_rd_status(0);
