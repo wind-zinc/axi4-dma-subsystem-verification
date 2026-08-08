@@ -57,6 +57,11 @@ package dma_subsys_env_pkg;
     `include "dma_subsys_status_fault_expansion_vseq.svh"
     `include "dma_subsys_abort_phase_matrix_vseq.svh"
     `include "dma_subsys_toggle_value_sweep_vseq.svh"
+    `include "dma_subsys_axil_condition_closure_vseq.svh"
+    `include "dma_subsys_tag_counter_rollover_vseq.svh"
+    `include "dma_subsys_legal_extent_vseq.svh"
+    `include "dma_subsys_axi_attribute_toggle_vseq.svh"
+    `include "dma_subsys_fsm_reset_arc_vseq.svh"
     `include "dma_subsys_env.svh"
     `include "dma_subsys_base_test.svh"
 

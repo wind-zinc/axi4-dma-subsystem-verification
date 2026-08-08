@@ -70,6 +70,21 @@ interface dma_subsys_test_ctrl_if(input logic clk);
     logic [DMA_CH_COUNT-1:0] force_manager_state_enable;
     logic [DMA_CH_COUNT-1:0][3:0] forced_manager_state;
 
+    // Narrow descriptor-handshake hooks and a read-only manager-state probe
+    // used by deterministic FSM coverage tests.  Static hierarchy remains in
+    // the top-level module; UVM classes access only this virtual interface.
+    logic [DMA_CH_COUNT-1:0] force_wr_desc_ready_low;
+    logic [DMA_CH_COUNT-1:0] force_rd_desc_ready_low;
+    logic [DMA_CH_COUNT-1:0][3:0] manager_state_observed;
+
+    // #0 clocking inputs sample after NBA updates, which is required when a
+    // sequence must recognize a one-cycle manager state before requesting
+    // reset on the following edge.
+    clocking state_mon_cb @(posedge clk);
+        default input #0;
+        input manager_state_observed;
+    endclocking
+
     task automatic clear_all();
         reset_request = 1'b0;
         force_bresp_enable = '0;
@@ -97,6 +112,8 @@ interface dma_subsys_test_ctrl_if(input logic clk);
         force_route_ready_low = '0;
         force_manager_state_enable = '0;
         forced_manager_state = '0;
+        force_wr_desc_ready_low = '0;
+        force_rd_desc_ready_low = '0;
     endtask
 
     task automatic pulse_reset(input int unsigned cycles = 20);

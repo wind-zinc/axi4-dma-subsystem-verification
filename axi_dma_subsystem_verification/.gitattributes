@@ -1,0 +1,4 @@
+# Nested coverage tooling is executed on Linux even when edited on Windows.
+sim/exclusions/*.sh text eol=lf
+sim/exclusions/*.py text eol=lf
+sim/exclusions/*.tsv text eol=lf

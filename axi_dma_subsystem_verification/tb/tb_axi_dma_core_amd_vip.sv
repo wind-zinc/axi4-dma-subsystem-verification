@@ -429,6 +429,9 @@ module tb_axi_dma_core_amd_vip;
         for (genvar inject_channel = 0;
                 inject_channel < DMA_CH_COUNT;
                 inject_channel++) begin : g_manager_injection
+            assign test_ctrl_if.manager_state_observed[inject_channel] =
+                dut.u_desc_manager.state_reg[inject_channel];
+
             always @(*) begin
                 if (test_ctrl_if.corrupt_rd_tag_enable[inject_channel]
                         || test_ctrl_if.force_rd_status_valid[
@@ -503,6 +506,20 @@ module tb_axi_dma_core_amd_vip;
                     force dut.route_req_ready[inject_channel] = 1'b0;
                 end else begin
                     release dut.route_req_ready[inject_channel];
+                end
+            end
+            always @(*) begin
+                if (test_ctrl_if.force_wr_desc_ready_low[inject_channel]) begin
+                    force dut.wr_desc_ready[inject_channel] = 1'b0;
+                end else begin
+                    release dut.wr_desc_ready[inject_channel];
+                end
+            end
+            always @(*) begin
+                if (test_ctrl_if.force_rd_desc_ready_low[inject_channel]) begin
+                    force dut.rd_desc_ready[inject_channel] = 1'b0;
+                end else begin
+                    release dut.rd_desc_ready[inject_channel];
                 end
             end
             always @(*) begin

@@ -70,4 +70,9 @@
 ../tb/uvm/tests/dma_subsys_status_fault_expansion_test.sv
 ../tb/uvm/tests/dma_subsys_abort_phase_matrix_test.sv
 ../tb/uvm/tests/dma_subsys_toggle_value_sweep_test.sv
+../tb/uvm/tests/dma_subsys_axil_condition_closure_test.sv
+../tb/uvm/tests/dma_subsys_tag_counter_rollover_test.sv
+../tb/uvm/tests/dma_subsys_legal_extent_test.sv
+../tb/uvm/tests/dma_subsys_axi_attribute_toggle_test.sv
+../tb/uvm/tests/dma_subsys_fsm_reset_arc_test.sv
 ../tb/uvm/tests/amd_axi_vip_smoke_test.sv

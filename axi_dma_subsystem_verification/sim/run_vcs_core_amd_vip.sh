@@ -19,6 +19,19 @@ cm_hier_file="${CM_HIER_FILE:-${project_root}/sim/cm_hier.cfg}"
 compile_only="${COMPILE_ONLY:-0}"
 reuse_compiled_simv="${REUSE_COMPILED_SIMV:-0}"
 skip_urg="${SKIP_URG:-0}"
+coverage_el="${COVERAGE_EL:-}"
+
+if [[ -n "${coverage_el}" ]]; then
+  if [[ "${coverage_el}" != /* ]]; then
+    coverage_el="${project_root}/${coverage_el}"
+  fi
+  if [[ ! -f "${coverage_el}" ]]; then
+    echo "ERROR: COVERAGE_EL does not exist: ${coverage_el}" >&2
+    exit 2
+  fi
+  # Strict mode rejects an exclusion file whose VDB checksum/object IDs do
+  # not match this compile, preventing stale waivers from silently applying.
+fi
 
 case "${coverage_enabled}" in
   0|1) ;;
@@ -93,6 +106,11 @@ regression_tests=(
   "dma_subsys_status_fault_expansion_test"
   "dma_subsys_abort_phase_matrix_test"
   "dma_subsys_toggle_value_sweep_test"
+  "dma_subsys_axil_condition_closure_test"
+  "dma_subsys_tag_counter_rollover_test"
+  "dma_subsys_legal_extent_test"
+  "dma_subsys_axi_attribute_toggle_test"
+  "dma_subsys_fsm_reset_arc_test"
 )
 
 vip_smoke_test="amd_axi_vip_smoke_test"
@@ -252,8 +270,14 @@ run_urg_report() {
   mkdir -p "$(dirname "${selected_log}")"
 
   set +e
-  "${urg_bin}" -dir "${cov_dir}" -metric "${selected_metrics}" \
-    -report "${selected_report_dir}" 2>&1 | tee "${selected_log}"
+  if [[ -n "${coverage_el}" ]]; then
+    "${urg_bin}" -dir "${cov_dir}" -metric "${selected_metrics}" \
+      -elfile "${coverage_el}" -excl_strict \
+      -report "${selected_report_dir}" 2>&1 | tee "${selected_log}"
+  else
+    "${urg_bin}" -dir "${cov_dir}" -metric "${selected_metrics}" \
+      -report "${selected_report_dir}" 2>&1 | tee "${selected_log}"
+  fi
   status="${PIPESTATUS[0]}"
   set -e
   return "${status}"
@@ -333,6 +357,9 @@ if [[ "${urg_only}" == "1" ]]; then
   echo "Coverage database : ${cov_dir}"
   echo "URG report        : ${report_dir}"
   echo "URG log           : ${urg_log}"
+  if [[ -n "${coverage_el}" ]]; then
+    echo "Coverage exclusion: ${coverage_el} (strict)"
+  fi
   if run_urg_with_line_fallback; then
     echo "Coverage database: ${cov_dir}"
     echo "URG dashboard:     ${final_report_dir}/dashboard.html"
@@ -456,6 +483,9 @@ echo "Simulation log    : ${sim_log}"
 if [[ "${coverage_enabled}" == "1" ]]; then
   echo "Coverage metrics  : ${coverage_metrics}"
   echo "URG metrics       : ${urg_metrics}"
+  if [[ -n "${coverage_el}" ]]; then
+    echo "Coverage exclusion: ${coverage_el} (strict)"
+  fi
   echo "Coverage database : ${cov_dir}"
   echo "URG report        : ${report_dir}"
   echo "URG log           : ${urg_log}"
