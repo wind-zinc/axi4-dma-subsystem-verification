@@ -75,4 +75,6 @@
 ../tb/uvm/tests/dma_subsys_legal_extent_test.sv
 ../tb/uvm/tests/dma_subsys_axi_attribute_toggle_test.sv
 ../tb/uvm/tests/dma_subsys_fsm_reset_arc_test.sv
+../tb/uvm/tests/dma_subsys_bus_toggle_closure_test.sv
+../tb/uvm/tests/dma_subsys_legal_tag_rollover_test.sv
 ../tb/uvm/tests/amd_axi_vip_smoke_test.sv

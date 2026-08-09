@@ -218,13 +218,17 @@ class dma_subsys_fsm_reset_arc_vseq extends dma_subsys_vseq_base;
             $sformatf("start %s", case_name));
         wait_channel_busy(channel);
 
-        // One illegal encoding executes the RTL default branch.  At this
-        // edge the underlying state receives ERROR_RECOVERY; release the
-        // force and assert reset before the following edge so URG observes
-        // ERROR_RECOVERY->IDLE rather than ERROR_RECOVERY->COMPLETE.
-        p_sequencer.test_ctrl_vif.forced_manager_state[index] = 4'hF;
+        // Place the observed manager directly in ERROR_RECOVERY, then make
+        // reset the next state-changing event.  Forcing an illegal encoding
+        // first hid the RTL's intermediate ERROR_RECOVERY assignment until
+        // release, so coverage could observe F->IDLE instead of the intended
+        // ERROR_RECOVERY->IDLE arc.
+        p_sequencer.test_ctrl_vif.forced_manager_state[index] =
+            ST_ERROR_RECOVERY;
         p_sequencer.test_ctrl_vif.force_manager_state_enable[index] = 1'b1;
-        @(p_sequencer.test_ctrl_vif.state_mon_cb);
+        wait_manager_state(
+            channel, ST_ERROR_RECOVERY, case_name);
+        @(negedge p_sequencer.test_ctrl_vif.clk);
         p_sequencer.test_ctrl_vif.reset_request = 1'b1;
         p_sequencer.test_ctrl_vif.force_manager_state_enable[index] = 1'b0;
         repeat (RESET_HOLD_CYCLES)

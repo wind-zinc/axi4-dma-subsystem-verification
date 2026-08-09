@@ -428,7 +428,9 @@ class dma_subsys_vseq_base extends uvm_sequence #(uvm_sequence_item);
         input int unsigned                   bytes_per_beat,
         input xil_axi_burst_t                burst,
         input bit [8*4096-1:0]               payload,
-        input string                         operation
+        input string                         operation,
+        input xil_axi_resp_t                 expected_response =
+            XIL_AXI_RESP_OKAY
     );
         xil_axi_data_beat [255:0] write_user;
         xil_axi_resp_t response;
@@ -498,10 +500,12 @@ class dma_subsys_vseq_base extends uvm_sequence #(uvm_sequence_item);
             `uvm_fatal(
                 "VSEQ_AXI_SHAPE_TIMEOUT",
                 $sformatf("%s write timed out", operation))
-        end else if (response != XIL_AXI_RESP_OKAY) begin
+        end else if (response != expected_response) begin
             `uvm_error(
                 "VSEQ_AXI_SHAPE_RESP",
-                $sformatf("%s write response=%0d", operation, response))
+                $sformatf(
+                    "%s expected write response=%0d, observed=%0d",
+                    operation, expected_response, response))
         end
     endtask
 

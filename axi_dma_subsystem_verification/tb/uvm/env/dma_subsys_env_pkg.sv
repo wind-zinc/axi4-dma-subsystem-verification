@@ -62,6 +62,8 @@ package dma_subsys_env_pkg;
     `include "dma_subsys_legal_extent_vseq.svh"
     `include "dma_subsys_axi_attribute_toggle_vseq.svh"
     `include "dma_subsys_fsm_reset_arc_vseq.svh"
+    `include "dma_subsys_bus_toggle_closure_vseq.svh"
+    `include "dma_subsys_legal_tag_rollover_vseq.svh"
     `include "dma_subsys_env.svh"
     `include "dma_subsys_base_test.svh"
 

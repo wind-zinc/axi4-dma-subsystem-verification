@@ -19,7 +19,10 @@ cm_hier_file="${CM_HIER_FILE:-${project_root}/sim/cm_hier.cfg}"
 compile_only="${COMPILE_ONLY:-0}"
 reuse_compiled_simv="${REUSE_COMPILED_SIMV:-0}"
 skip_urg="${SKIP_URG:-0}"
-coverage_el="${COVERAGE_EL:-}"
+# The reviewed project waiver is the default.  Set COVERAGE_EL= explicitly
+# to produce an unwaived diagnostic report without changing this script.
+default_coverage_el="${project_root}/sim/exclusions/subsystem_unreachable.el"
+coverage_el="${COVERAGE_EL-${default_coverage_el}}"
 
 if [[ -n "${coverage_el}" ]]; then
   if [[ "${coverage_el}" != /* ]]; then
@@ -111,6 +114,8 @@ regression_tests=(
   "dma_subsys_legal_extent_test"
   "dma_subsys_axi_attribute_toggle_test"
   "dma_subsys_fsm_reset_arc_test"
+  "dma_subsys_bus_toggle_closure_test"
+  "dma_subsys_legal_tag_rollover_test"
 )
 
 vip_smoke_test="amd_axi_vip_smoke_test"
