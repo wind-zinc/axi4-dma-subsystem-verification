@@ -1,52 +1,50 @@
 # AXI4 Multi-Descriptor DMA Subsystem IP Verification Plan
 
-**Document type:** Verification plan  
-**Version:** Draft 1.0  
-**Scope:** IP-level RTL verification  
-**Methodology:** SystemVerilog, UVM 1.2, UVM RAL, SVA, VCS/URG  
-**Purpose:** Define what must be verified for one AXI4 memory-to-memory DMA subsystem IP before it is used as a verified building block in a larger subsystem.
+**Document type:** Verification plan
 
-## 1. Executive Summary
+**Version:** 1.0
 
-This plan defines an IP-level verification strategy for an AXI4 multi-descriptor memory-to-memory DMA subsystem. The IP is programmed through AXI4-Lite, accepts and validates descriptors, moves bytes through an internal AXI4-Stream path, accesses external memory through AXI4, records completion information, and optionally raises an interrupt.
+**Lifecycle phase:** Pre-regression planning
 
-The plan is intentionally **IP-centric**. It verifies the correctness of one DMA subsystem instance and its direct control/memory interfaces. It does not attempt to verify multi-DMA routing, multiple external AXI masters, shared-memory Crossbar arbitration, or multi-memory system address mapping; those belong to the system-level verification plan.
+**Scope:** IP-level RTL verification
 
-The final outcome expected from this plan is an evidence-backed IP verification baseline: reusable tests, a transaction-accurate scoreboard, assertions, functional coverage, a regression flow, and documented scope exclusions.
+**Methodology:** SystemVerilog, UVM 1.2, UVM RAL, SVA, and VCS/URG
 
-## 2. Design Scope
+## 1. Purpose
 
-### 2.1 Functional architecture
+This document defines the verification objectives, environment, stimulus, checking, coverage, and completion criteria for one AXI4 multi-descriptor memory-to-memory DMA subsystem IP.
+
+The DMA is programmed through AXI4-Lite. It validates and queues descriptors, transfers data through an internal AXI4-Stream path, accesses external memory through AXI4, records completion information, and optionally raises an interrupt.
+
+## 2. DUT Overview
 
 ```text
 AXI4-Lite software control
-  → descriptor staging registers
-  → SUBMIT command
-  → descriptor validation + request FIFO
-  → descriptor manager
-  → AXI DMA read engine
-  → internal AXI4-Stream FIFO
-  → AXI DMA write engine
-  → AXI4 external memory
-  → completion FIFO / status / IRQ
+  -> descriptor staging registers
+  -> SUBMIT command
+  -> descriptor validation and request FIFO
+  -> descriptor manager
+  -> AXI DMA read engine
+  -> internal AXI4-Stream FIFO
+  -> AXI DMA write engine
+  -> AXI4 external memory
+  -> completion FIFO, status, and IRQ
 ```
 
-The descriptor manager is expected to execute accepted requests in order. Each accepted transfer reads a source byte range and writes the same byte stream to a non-overlapping destination range. Completion information is made visible through the control plane after both read-side and write-side status are available.
+Accepted descriptors are expected to execute in order. Each descriptor identifies a source byte range, a non-overlapping destination byte range, a transfer length, a tag, and interrupt control. Completion information becomes visible after the read-side and write-side terminal status is available.
 
-### 2.2 Interfaces under verification
+### 2.1 Interfaces
 
-| Interface | Direction | Verification responsibility |
+| Interface | Direction | Planned verification focus |
 | --- | --- | --- |
-| `clk`, `rst` | Input | Synchronous reset behavior, state cleanup, and post-reset recovery. |
+| `clk`, `rst` | Input | Reset behavior, state cleanup, and recovery. |
 | `s_axil_*` | AXI4-Lite slave | Register access, command semantics, response behavior, and protocol stability. |
-| `m_axi_*` | AXI4 master | Read/write burst generation, AXI protocol behavior, data integrity, and response handling. |
+| `m_axi_*` | AXI4 master | Burst generation, protocol behavior, data integrity, backpressure, and error responses. |
 | `irq` | Output | Completion-driven, level-sensitive interrupt behavior. |
 
-### 2.3 Target configuration
+### 2.2 Verification configuration
 
-This plan targets the following checked-in configuration. Any parameter change requires a verification-impact review.
-
-| Item | Target configuration |
+| Item | Planned configuration |
 | --- | --- |
 | AXI4-Lite address / data width | 8 / 32 bits |
 | AXI4 address / data / ID width | 16 / 32 / 8 bits |
@@ -60,277 +58,290 @@ This plan targets the following checked-in configuration. Any parameter change r
 | `ENABLE_SG` | `0` |
 | Clock | 100 MHz |
 
-## 3. Requirements to be Verified
+Parameter changes require review of the affected stimulus constraints, predictions, assertions, and coverage model.
 
-### 3.1 Control-plane requirements
+## 3. Verification Objectives
 
-The verification environment shall demonstrate that:
+### 3.1 Control plane
+
+Verification shall demonstrate that:
 
 - Software can program source address, destination address, length, tag, and interrupt enable through AXI4-Lite.
 - `SUBMIT`, `COMP_POP`, and sticky-status clear operations have write-one command semantics.
-- Descriptor staging registers respect byte strobes.
-- Read-only registers are protected from writes.
-- Unsupported or reserved accesses produce the specified benign/default behavior.
-- Empty completion-head registers return the specified empty values.
-- Status, queue level, submitted count, and completed count are readable and internally consistent.
+- Descriptor staging registers honor byte write strobes.
+- Read-only and write-only locations follow the register access policy.
+- Reserved and unmapped addresses return the specified response and read data.
+- Empty completion-head registers return their defined empty values.
+- Status, queue level, submitted count, and completed count remain internally consistent.
 
-### 3.2 Descriptor-admission requirements
+### 3.2 Descriptor admission
 
-The plan shall verify that descriptor acceptance is controlled by the configured policy:
+Verification shall demonstrate that:
 
-- A valid descriptor is accepted only when the request FIFO can accept it.
-- Zero-length requests are rejected.
-- Source and destination alignment is enforced when unaligned transfers are disabled.
-- Address, length, and tag fields outside their configured widths are rejected.
-- Source and destination byte ranges must remain within the configured AXI address space.
-- Source and destination ranges must not overlap; adjacent non-overlapping ranges remain legal.
-- Full-FIFO rejection and invalid-descriptor rejection are separately visible through the defined status mechanism.
+- A valid descriptor is accepted when the request FIFO has space.
+- A descriptor is rejected when the request FIFO is full.
+- Zero-length transfers are rejected.
+- Source and destination alignment rules are enforced.
+- Address, length, and tag fields are interpreted at their configured widths.
+- Source and destination ranges remain within the configured AXI address space.
+- Overlapping source and destination byte ranges are rejected.
+- Adjacent, non-overlapping byte ranges remain legal.
+- Invalid-descriptor and full-queue outcomes are reflected in the defined status fields.
 
-### 3.3 Data-movement requirements
+### 3.3 Data movement
 
 For every accepted descriptor, verification shall establish that:
 
-- The DMA reads exactly the requested source byte range.
-- The DMA writes exactly the requested destination byte range.
-- Destination bytes equal the source bytes captured at descriptor start.
-- AXI burst length, beat size, address increment, `WLAST`, byte strobes, and 4 KiB boundary behavior are legal.
-- Partial final beats preserve correct byte enables and do not corrupt neighboring bytes.
-- Descriptor execution and completion records remain in the required order.
-- Completion tag, actual length, read error, write error, and mismatch fields encode the outcome correctly.
+- The requested source byte range is read exactly once for the transfer.
+- The destination receives the source byte stream in order.
+- Bytes outside the requested destination range remain unchanged.
+- Burst address, length, size, increment, and 4 KiB boundary behavior are legal.
+- Write data, byte strobes, and `WLAST` are correct for every beat.
+- Partial final beats update only the intended byte lanes.
+- Descriptor execution and completion records preserve the required ordering.
+- Completion tag, actual length, read error, write error, and mismatch fields encode the expected outcome.
 
-### 3.4 Resilience requirements
+### 3.4 Flow control and error handling
 
-The IP shall maintain protocol correctness and either complete or report the specified error outcome when subjected to:
+Verification shall exercise:
 
-- Independent AW, W, B, AR, and R channel stalls.
-- Internal AXI4-Stream FIFO backpressure.
-- Multiple accepted but incomplete AXI bursts.
-- Address-matched AXI read/write `SLVERR` and `DECERR` responses.
-- Reset while idle, while a descriptor is active, and while AXI transactions are active.
+- Independent stalls on AW, W, B, AR, and R channels.
+- Backpressure in the internal AXI4-Stream path.
+- Multiple accepted but incomplete AXI transactions.
+- Address-selected AXI read and write `SLVERR` responses.
+- Address-selected AXI read and write `DECERR` responses.
+- Reset while idle, while a descriptor is active, and while AXI traffic is active.
 
-### 3.5 Completion and interrupt requirements
+The DUT is expected to preserve protocol correctness and reach the defined completion or error state for each condition.
 
-The plan shall verify that:
+### 3.5 Completion and interrupt
+
+Verification shall demonstrate that:
 
 - A completion is recorded only after the transfer reaches its defined terminal state.
-- Completion FIFO head fields represent the oldest unpopped completion.
-- `COMP_POP` removes one completion and does not corrupt remaining entries.
-- IRQ remains low when disabled.
-- With IRQ enabled, IRQ is high while at least one completion remains pending.
-- IRQ deasserts after the last completion is popped.
+- Completion-head fields represent the oldest unpopped completion.
+- `COMP_POP` removes one completion without corrupting later entries.
+- IRQ remains low when interrupt generation is disabled.
+- With interrupt generation enabled, IRQ remains high while a completion is pending.
+- IRQ deasserts after the final pending completion is removed.
 
-## 4. Verification Environment Architecture
+## 4. Verification Methodology
 
-The UVM environment shall be built around independent stimulus, observation, and prediction.
+The verification environment will combine directed tests, constrained-random stimulus, an independent reference model, end-to-end scoreboarding, protocol assertions, and functional coverage.
+
+Directed scenarios will establish deterministic behavior for register semantics, descriptor boundaries, queue transitions, error responses, and reset. Constrained-random scenarios will combine legal descriptor attributes, queue timing, memory latency, backpressure, and error injection. Coverage-directed scenarios will target planned conditions that remain unobserved after the main regression suites.
+
+## 5. Verification Environment
 
 | Component | Planned responsibility |
 | --- | --- |
-| Active AXI-Lite UVM agent | Drive and monitor register accesses, byte strobes, command writes, and response behavior. |
-| UVM RAL model | Provide frontdoor access to all control/status registers through an adapter and monitor-driven predictor. |
-| Descriptor/manager monitor | Observe descriptor acceptance, rejection, queue level, active state, and completion records. |
-| AXI memory proxy | Sit between DUT and memory; independently control AW/W/B/AR/R stalls, delayed responses, outstanding requests, and address-matched error injection. |
-| AXI RAM model | Hold deterministic initial source data and accept the DUT's real AXI transactions. |
-| Reference memory model | Maintain a byte-addressable expected-memory image independent of the RTL implementation. |
-| Scoreboard | Compare AXI behavior, destination bytes, completion metadata, counters, status, and IRQ against the expected model. |
-| Coverage collector | Sample functional events and crosses defined in Section 7. |
-| SVA checker set | Check protocol stability, burst rules, FIFO bounds, state/count consistency, IRQ semantics, and reset behavior. |
-| Regression launcher | Compile, run, seed, collect logs, and merge coverage data reproducibly. |
+| Active AXI-Lite agent | Drive and monitor register accesses, byte strobes, command writes, and responses. |
+| UVM RAL model | Represent the control/status register map and support frontdoor access through an adapter and predictor. |
+| Descriptor monitor | Observe descriptor acceptance, rejection, queue state, active state, and completion records. |
+| AXI memory proxy | Control channel stalls, response delay, outstanding traffic, and address-selected error injection. |
+| AXI RAM model | Provide deterministic source data and accept DUT AXI transactions. |
+| Reference memory model | Maintain a byte-addressable expected-memory image. |
+| Scoreboard | Compare AXI activity, destination data, completion metadata, counters, status, and IRQ with predictions. |
+| Coverage collector | Sample planned functional events and crosses. |
+| SVA checker set | Check interface stability, burst legality, FIFO bounds, state consistency, IRQ semantics, and reset behavior. |
+| Regression launcher | Compile tests, select seeds, collect logs, and merge coverage data. |
 
-### 4.1 Reference-model and scoreboard policy
+### 5.1 Reference model
 
-The reference model must not duplicate the descriptor-manager state machine, FIFO pointers, or RTL burst-splitting implementation. Instead it shall:
+The reference model will:
 
-1. Initialize to the same deterministic memory image as the AXI RAM.
-2. Snapshot expected source bytes when a descriptor begins.
-3. Construct expected destination bytes and expected completion fields from the descriptor and injected memory behavior.
-4. Update expected memory only for accepted writes.
-5. Compare observed AXI write data and destination memory against this independent model.
-6. Fail the test if a burst remains unfinished or a descriptor is unexpectedly active at test end.
+1. Initialize with the same deterministic memory contents as the AXI RAM.
+2. Capture expected source bytes when descriptor execution begins.
+3. Build the expected destination image and completion fields from the descriptor and injected response behavior.
+4. Update expected memory for accepted write beats and active byte lanes.
+5. Predict status, counters, queue state, and interrupt behavior from observed transactions.
 
-## 5. Test Strategy
+### 5.2 End-of-test checks
 
-The test plan uses directed tests for specific requirements, constrained-random tests for combinations, assertion-driven stress for protocol behavior, and coverage-closure tests for hard-to-reach legal states.
+Each test will check that:
 
-### P0 — Build, reset, and basic connectivity
+- Expected descriptors have reached their planned terminal state.
+- AXI bursts and completion records are accounted for.
+- Observed destination bytes match the reference memory.
+- Queue, counter, status, and interrupt predictions match the DUT.
+- No unexpected protocol or assertion failure remains.
 
-| Scenario | Expected check |
+## 6. Planned Test Scenarios
+
+### 6.1 Build, reset, and basic operation
+
+| Testpoint | Planned stimulus and checks |
 | --- | --- |
-| Elaboration smoke | DUT, AXI-Lite agent, memory proxy, RAM, RAL, scoreboard, and assertions connect and initialize. |
-| Idle reset | All FIFOs, counters, active state, completion state, sticky status, and IRQ reset to defined values. |
-| Basic programmed transfer | One aligned, non-overlapping transfer completes with correct destination data and completion record. |
+| Elaboration and connectivity | Initialize the DUT, agents, RAL model, memory path, scoreboard, assertions, and coverage components. |
+| Idle reset | Check FIFO state, counters, active state, completion state, sticky status, and IRQ. |
+| Basic transfer | Program one aligned, non-overlapping descriptor and check data and completion fields. |
+| Back-to-back transfers | Submit multiple legal descriptors and check ordering and independent completion metadata. |
 
-### P1 — AXI-Lite and register-access behavior
+### 6.2 AXI4-Lite and register behavior
 
-| Scenario | Expected check |
+| Testpoint | Planned stimulus and checks |
 | --- | --- |
-| RAL frontdoor programming | Program source, destination, length, tag, control, submit, and completion pop through RAL. |
-| Register readback | Check writable fields, status fields, queue levels, submitted/completed counts, and empty-completion values. |
-| WSTRB matrix | Exercise all single-byte, multi-byte, and full-byte write-strobe patterns relevant to staging registers. |
-| Access policy | Attempt reads of write-only locations, writes to read-only locations, and accesses to unsupported addresses. |
-| Command no-op | Confirm zero-data/zero-strobe command writes do not create submit, pop, or clear pulses. |
+| RAL frontdoor access | Program descriptor fields and commands through the register model. |
+| Register readback | Check writable fields, status fields, queue levels, counters, and completion-head fields. |
+| Write strobes | Exercise relevant single-byte, multi-byte, and full-word strobe patterns. |
+| Access policy | Read and write each register category and access unmapped addresses. |
+| Command semantics | Exercise asserted and non-asserted command bits with varied write strobes. |
+| Sticky status | Create each planned sticky condition, read it, clear it, and check later operation. |
 
-### P2 — Descriptor validity, boundaries, and queues
+### 6.3 Descriptor legality and boundaries
 
-| Scenario | Expected check |
+| Testpoint | Planned stimulus and checks |
 | --- | --- |
-| Length sweep | Cover sub-beat, one-beat, multi-beat, long, and maximum-supported transfer lengths. |
-| Tag sweep | Cover zero, normal, and maximum configured tag values. |
-| Alignment matrix | Verify aligned descriptors; reject all prohibited source/destination offsets. |
-| Address range | Verify legal low/high addresses and reject width overflow, range overflow, and wraparound. |
-| Overlap matrix | Cover non-overlap, adjacency, source-before-destination overlap, destination-before-source overlap, and identical ranges. |
-| 4 KiB matrix | Cover neither/source/destination/both-side crossing and required burst splitting. |
-| Request FIFO saturation | Fill the request FIFO, observe the full condition/rejection behavior, then drain it. |
-| Completion FIFO behavior | Build pending completions, observe full/empty behavior, pop entries, and confirm ordering. |
+| Length classes | Exercise zero, sub-beat, one-beat, multi-beat, long, and maximum-supported lengths. |
+| Tag values | Exercise zero, intermediate, and maximum configured tag values. |
+| Alignment | Exercise legal alignment and each prohibited source/destination offset. |
+| Address range | Exercise low and high legal addresses, range overflow, and wraparound cases. |
+| Overlap relation | Exercise non-overlap, adjacency, partial overlap in both directions, and identical ranges. |
+| 4 KiB boundaries | Exercise source and destination ranges that do and do not require burst splitting. |
 
-### P3 — AXI transfer, backpressure, and outstanding traffic
+### 6.4 Queue and completion behavior
 
-| Scenario | Expected check |
+| Testpoint | Planned stimulus and checks |
 | --- | --- |
-| AW stall | Hold `AWREADY` low and check stable write-address signals and later progress. |
-| W stall | Hold `WREADY` low and check stable write data/strb/last signals and later progress. |
-| B stall | Delay B responses and check write completion/status handling. |
-| AR stall | Hold `ARREADY` low and check stable read-address signals and later progress. |
-| R stall | Delay read data and check stable behavior, internal backpressure, and recovery. |
-| AXIS FIFO pressure | Fill or stall the stream path and check that backpressure propagates without data loss. |
-| Multiple outstanding bursts | Permit multiple incomplete reads/writes, delay responses, and check IDs, ordering, and completion correctness. |
-| Partial final beat | Use non-word-multiple lengths; check `WSTRB`, source/destination bytes, and final `WLAST`. |
+| Request queue occupancy | Drive empty, partially occupied, full, reject, and drain transitions. |
+| Completion queue occupancy | Create pending completions, observe head data, pop entries, and check ordering. |
+| Simultaneous activity | Combine descriptor submission, active transfer, completion production, and completion pop. |
+| Empty completion pop | Pop an empty completion queue and check the defined status behavior. |
 
-### P4 — Error, completion, IRQ, and reset
+### 6.5 AXI traffic and backpressure
 
-| Scenario | Expected check |
+| Testpoint | Planned stimulus and checks |
 | --- | --- |
-| Read `SLVERR` | Inject a source-side `SLVERR`; check completion read-error encoding and software-visible status. |
-| Read `DECERR` | Inject a source-side `DECERR`; check completion read-error encoding and software-visible status. |
-| Write `SLVERR` | Inject a destination-side `SLVERR`; check completion write-error encoding and software-visible status. |
-| Write `DECERR` | Inject a destination-side `DECERR`; check completion write-error encoding and software-visible status. |
-| IRQ disabled/enabled | Verify level-sensitive IRQ behavior in both modes. |
-| Empty completion pop | Verify sticky empty-pop status and its clear behavior. |
-| Reset recovery | Apply reset at legal idle/active/AXI-active points; check cleanup, IRQ low, and a subsequent successful transfer. |
+| AW stall | Hold `AWREADY` low, check address stability, then release the channel. |
+| W stall | Hold `WREADY` low, check data, strobe, and last stability, then release the channel. |
+| B delay | Delay write responses and check write completion accounting. |
+| AR stall | Hold `ARREADY` low, check address stability, then release the channel. |
+| R delay | Delay read data and check downstream backpressure and recovery. |
+| AXI4-Stream pressure | Stall the stream path and check lossless propagation of backpressure. |
+| Outstanding traffic | Permit multiple incomplete bursts and vary response latency. |
+| Partial final beat | Use non-word-multiple lengths and check final byte lanes and `WLAST`. |
 
-### P5 — Constrained-random and closure testing
+### 6.6 Errors, interrupt, and reset
 
-| Scenario | Expected check |
+| Testpoint | Planned stimulus and checks |
 | --- | --- |
-| Legal constrained-random descriptors | Randomize source/destination, lengths, tags, queue timing, and memory latency while scoreboard checks every transfer. |
-| Negative constrained-random descriptors | Randomize invalid fields and check rejection/status instead of data movement. |
-| Mixed queue traffic | Randomize submissions, completion pops, IRQ enable state, and status reads around active traffic. |
-| Coverage-directed tests | Target uncovered legal combinations, rare FSM transitions, backpressure arcs, and assertion cover properties. |
-| Long-running stress | Repeatedly execute legal transfers with random stalls/errors to detect state leakage or transaction loss. |
+| Read `SLVERR` / `DECERR` | Inject each response and check completion and software-visible error state. |
+| Write `SLVERR` / `DECERR` | Inject each response and check completion and software-visible error state. |
+| IRQ disabled / enabled | Check level behavior across completion production and pop operations. |
+| Reset during operation | Apply reset at planned control and AXI activity points, then check cleanup and recovery. |
 
-## 6. Assertion Plan
+### 6.7 Constrained-random scenarios
 
-Assertions are required to catch errors close to their origin rather than relying only on end-of-test data mismatch.
+Constrained-random stimulus will combine:
 
-| Assertion family | Required properties |
+- legal source and destination addresses;
+- transfer length and tag classes;
+- descriptor submission and completion-pop timing;
+- channel latency and backpressure;
+- interrupt enable state;
+- legal error-injection locations and response types.
+
+Negative random scenarios will generate one identifiable descriptor error at a time so that the expected rejection reason remains deterministic.
+
+## 7. Assertion Plan
+
+| Assertion family | Planned properties |
 | --- | --- |
-| AXI4-Lite protocol | AW/W/AR/B/R payload stability while valid is held under stall; legal response handshakes. |
-| AXI4 master protocol | AW/W/AR/R/B stability under stall, legal INCR bursts, beat-size rules, 4 KiB legality, known payloads, and valid `WLAST`. |
-| Descriptor path | Descriptor payload stability during acceptance stalls; no descriptor execution without valid acceptance. |
-| AXIS FIFO | Stable stream payload/sidebands under `TVALID && !TREADY`; FIFO bounds and correct backpressure propagation. |
-| Queue and counters | Request/completion FIFO bounds, count consistency, legal push/pop behavior, and in-order completion state. |
-| IRQ and reset | IRQ equation, IRQ deassertion after final pop, reset state cleanup, and no illegal post-reset activation. |
+| AXI4-Lite protocol | Payload stability under stall and legal request/response handshakes. |
+| AXI4 master protocol | Payload stability, INCR burst rules, beat size, 4 KiB legality, known payloads, and `WLAST`. |
+| Descriptor path | Descriptor stability during acceptance stalls and execution only after acceptance. |
+| AXI4-Stream path | Payload stability under stall, FIFO bounds, and backpressure propagation. |
+| Queue and counters | Legal push/pop behavior, bounds, count consistency, and completion ordering. |
+| IRQ and reset | Interrupt-state relation, reset cleanup, and legal post-reset activation. |
 
-Assertion cover properties shall be defined for important legal stress conditions so that a regression proves they were actually activated.
+Cover properties will identify whether key legal stall, queue, error, and reset sequences have occurred.
 
-## 7. Functional Coverage Plan
+## 8. Functional Coverage Plan
 
-Functional coverage is a measurement plan, not a substitute for scoreboard or assertion checking. The following covergroups and crosses are required.
-
-| Coverage area | Planned samples |
+| Coverage area | Planned sample space |
 | --- | --- |
-| AXI-Lite access | Read/write direction, register category, WSTRB class and lanes, response, operation/address cross. |
-| RAL access | Frontdoor configuration writes, commands, status reads, and predictor-consistent accesses. |
-| Descriptor properties | Legal/invalid result, length class, alignment, tag class, range boundary, high-bit validity, overlap relation, and source/destination 4 KiB crossings. |
-| Queue/status | Request/completion occupancy, push/pop, submit outcome, active state, sticky status, and clear sequence. |
-| AXI transfer | Burst size/length, residual burst, 4 KiB split, partial final beat, and `WLAST`. |
-| Backpressure | AW/W/B/AR/R stall and recovery, AXIS stall/recovery, and FIFO-full propagation. |
-| Errors | Read/write `OKAY`, `SLVERR`, `DECERR`, and completion/error-status cross. |
-| Outstanding traffic | Read/write outstanding depth and delayed response combinations. |
-| Completion/IRQ/reset | Completion presence, tag/length/status class, IRQ enable/level, pop behavior, reset point, and recovery result. |
+| AXI4-Lite access | Operation, register category, strobe class, byte lanes, address, and response. |
+| Descriptor properties | Admission result, length class, alignment, tag class, range boundary, overlap relation, and 4 KiB crossing. |
+| Queue and status | Request/completion occupancy, push/pop, submit outcome, active state, sticky status, and clear sequence. |
+| AXI transfer | Burst length, residual burst, boundary split, partial final beat, byte strobes, and `WLAST`. |
+| Backpressure | AW/W/B/AR/R stall and recovery, stream stall and recovery, and FIFO-full propagation. |
+| Error handling | Read/write response type and corresponding completion status. |
+| Outstanding traffic | Read and write outstanding depth with varied response delay. |
+| Completion, IRQ, and reset | Completion state, tag/length/status class, interrupt state, pop behavior, reset point, and recovery. |
 
-Required crosses include at minimum:
+Planned crosses include:
 
-- source/destination boundary condition × transfer-length class;
-- descriptor validity × submit outcome;
-- queue level × completion presence;
-- memory response type × completion error status;
-- channel-stall type × recovery outcome;
-- IRQ enable × completion FIFO state;
-- reset point × post-reset recovery result.
+- source/destination boundary condition by transfer-length class;
+- descriptor-validity class by submit outcome;
+- queue occupancy by completion state;
+- memory response type by completion error status;
+- channel-stall type by recovery outcome;
+- interrupt-enable state by completion-queue state;
+- reset point by post-reset recovery result.
 
-Coverage closure requires every planned functional bin to be hit or formally waived with a documented reason. Any waiver must identify whether the bin is impossible by construction, disabled by the target parameter configuration, or intentionally out of scope.
+## 9. Regression Strategy
 
-## 8. Regression and Reporting Requirements
+The regression flow will provide:
 
-The regression flow shall:
+- a smoke suite for build, reset, register access, and one basic transfer;
+- directed suites grouped by control plane, descriptor handling, AXI traffic, error handling, and reset;
+- constrained-random suites with recorded seeds;
+- coverage-directed runs for unobserved planned conditions;
+- reproducible logging of simulator version, RTL revision, configuration, seed, timeout, and result;
+- merged assertion, functional, and code coverage for review.
 
-- Run directed P0-P4 tests before broad constrained-random tests.
-- Record test name, random seed, simulator version, RTL revision, timeout, and result.
-- Preserve UVM logs, assertion failures, scoreboard diagnostics, and coverage database information.
-- Run a smoke subset for fast change detection and a full regression for closure.
-- Distinguish black-box functional tests from white-box coverage-activation tests.
-- Publish a report that lists pass/fail status, coverage state, reviewed exclusions, open issues, and scope changes.
+Failures will be classified by requirement, scenario, seed, failing checker, and first observed error. A fixed failure will be rerun with the reproducing seed and the affected suite before regression completion.
 
-No verification result may be claimed solely from code coverage. A passing closure requires coherent evidence from tests, scoreboard checks, assertions, and functional coverage.
+## 10. Entry Criteria
 
-## 9. Entry and Exit Criteria
+Regression execution may begin when:
 
-### Entry criteria
+- DUT interfaces, register map, descriptor format, and target parameters are available.
+- The testbench, agents, RAL model, memory path, scoreboard, assertions, and coverage model compile together.
+- Memory initialization, backpressure controls, and error injection are deterministic.
+- Each scheduled testpoint has a defined stimulus intent and expected outcome.
+- Basic reset and one programmed transfer complete in the smoke environment.
 
-- DUT interfaces, register map, descriptor format, and parameter configuration are stable enough to create predictions.
-- AXI-Lite agent, RAL model, memory proxy, RAM, reference model, scoreboard, assertions, and regression launcher compile together.
-- Memory initialization and error/backpressure controls are deterministic and reset between tests.
-- Each planned test has an expected positive or negative outcome.
+## 11. Completion Criteria
 
-### Test pass criteria
+Verification is ready for sign-off review when:
 
-- Test completes before its defined timeout.
-- No unexpected UVM error or fatal occurs.
-- No assertion failure or unexpected protocol violation occurs.
-- Scoreboard data, burst, completion, status, counter, and IRQ checks match the expected outcome.
-- Negative tests demonstrate the specified rejection/error result rather than silently completing as normal transfers.
+- Every planned requirement is linked to one or more executed testpoints and checkers.
+- All scheduled directed and constrained-random suites complete without unresolved failures.
+- Scoreboard, protocol, completion, status, counter, reset, and interrupt checks pass.
+- Planned functional coverage is exercised or reviewed with a documented disposition.
+- Assertion coverage confirms activation of the planned legal scenarios, with no unresolved assertion failures.
+- Code coverage is reviewed for unexecuted logic relevant to the configured feature set.
+- Known issues and deferred features have an owner and disposition.
+- Regression results and coverage summaries are captured in a separate verification report.
 
-### Verification closure criteria
+## 12. Dependencies and Risks
 
-- All planned P0-P4 requirements have passing, traceable tests.
-- P5 random/stress testing has exercised the planned combinations and revealed no unresolved correctness issue.
-- Functional coverage targets are reached or remaining bins are review-approved waivers.
-- Assertion properties have no failures and their cover properties have been activated by targeted tests.
-- Code coverage is reviewed for meaningful unexecuted logic; exclusions are documented.
-- All open issues, unsupported parameters, and intentionally excluded features are recorded in the final verification report.
+| Item | Planned handling |
+| --- | --- |
+| AXI memory behavior | Use a controllable proxy and RAM model for deterministic stalls, delay, and response injection. |
+| Descriptor prediction | Derive expected transfer and completion data from observed programming transactions. |
+| Reset during outstanding traffic | Coordinate monitor and scoreboard reset handling with the DUT reset contract. |
+| Rare boundary combinations | Use focused constraints and coverage-directed scenarios. |
+| Parameter variation | Review affected requirements and rerun the applicable suites for each supported configuration. |
 
-## 10. Scope Exclusions and Escalation Rules
+## 13. Deferred Features
 
-The following are excluded from this plan unless the design configuration changes:
+The following features are not scheduled for the configuration in Section 2.2:
 
-- Unaligned transfer shifting when `ENABLE_UNALIGNED=1`.
-- Scatter-gather linked-list descriptor fetch when `ENABLE_SG=1`.
-- Multi-engine/multi-channel scheduling within the IP.
-- Out-of-order descriptor completion behavior.
-- Any write-abort behavior not explicitly defined in the IP specification.
+- unaligned transfer shifting with `ENABLE_UNALIGNED=1`;
+- scatter-gather descriptor fetch with `ENABLE_SG=1`;
+- multi-engine or multi-channel scheduling inside the IP;
+- out-of-order descriptor completion;
+- write-abort behavior beyond the defined IP interface contract.
 
-Enabling an excluded feature, changing an interface width, changing FIFO depth, changing maximum burst length, or changing the register/descriptor specification shall trigger:
+## 14. Planned Deliverables
 
-1. Requirement-impact review.
-2. Reference-model and scoreboard update review.
-3. Assertion and coverage-plan update.
-4. Targeted regression followed by full-regression re-execution.
-
-## 11. Handoff to System-Level Verification
-
-Once this plan reaches closure, the IP verification baseline can be reused by the larger AXI DMA subsystem effort. The system-level plan should rely on the IP baseline for:
-
-- Single-instance descriptor acceptance, queues, completion, IRQ, reset, and byte-accurate data movement.
-- AXI burst, backpressure, error-response, and outstanding-transaction behavior.
-- AXI-Lite register and command semantics.
-
-The system-level plan must independently verify what this IP-level plan excludes:
-
-- Multiple DMA channels and their simultaneous operation.
-- AXI-Lite Crossbar decoding to channel and IRQ/status blocks.
-- AXI-Stream routing between DMA channel readers and writers.
-- AXI Crossbar sharing among DMA and external masters.
-- Multiple memory windows, memory VIP behavior, and same-RAM arbitration.
-
-This separation keeps the IP verification focused and gives the system-level environment a clear, non-duplicated foundation.
-
+- reviewed verification plan and requirement-to-testpoint traceability;
+- reusable UVM environment and RAL model;
+- directed and constrained-random tests;
+- independent reference memory model and scoreboard;
+- protocol and design assertions;
+- functional coverage model;
+- regression launcher and reproducible run configuration;
+- regression results, coverage summaries, issue disposition, and sign-off report.

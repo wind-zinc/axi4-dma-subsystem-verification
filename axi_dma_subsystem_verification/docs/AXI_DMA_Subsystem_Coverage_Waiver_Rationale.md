@@ -8,6 +8,8 @@ This document explains the reviewed exclusions stored in:
 sim/exclusions/subsystem_unreachable.el
 ```
 
+The checked-in `.el` file contains 6 line-block, 22 condition, 170 toggle, 2 FSM-transition, and 2 branch directives.
+
 The file applies only to structural code coverage for the configured subsystem RTL. Assertions and functional covergroups are reported but are never waived by this file.
 
 The current `.el` contains the following exclusion directives:
@@ -34,7 +36,7 @@ urg -dir <merged.vdb> \
   -report <report-directory>
 ```
 
-`-excl_strict` is required. The `.el` contains module checksums and object IDs tied to the current source and elaboration. If RTL, hierarchy, parameters, or the VCS version changes, the file must be revalidated. A checksum failure is a safety feature; do not bypass it by disabling strict mode for sign-off.
+The sign-off flow applies `-excl_strict`. The `.el` contains module checksums and object IDs tied to the source and elaboration; a checksum mismatch stops the exclusion file from applying.
 
 The reviewed file was also cleaned against `attempts.log`. Exclusions that referred to already-covered objects were removed. This avoids the URG warning that attempts to exclude covered objects were ignored.
 
@@ -209,7 +211,7 @@ The following remain real coverage targets:
 - error responses, abort classifications, IRQ masking, reset recovery, and completion reordering; and
 - any uncovered object for which reachability has not been proven either way.
 
-The final `.el` must not be broadened to cover these items merely to raise a percentage.
+These items remain outside the exclusion file.
 
 ## 9. Review and maintenance rules
 

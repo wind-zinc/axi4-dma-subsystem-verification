@@ -1,46 +1,84 @@
-# RAL 文件组成
+# AXI4 DMA RAL Mapping
 
-| 文件 | 作用 |
+This document describes `tb/uvm/ral/dma_reg_model.sv` and its mapping to `rtl/dma_desc_manager.v`.
+
+## 1. File Relationships
+
+| File | Responsibility |
 |---|---|
-| `dma_reg_model.sv` | 定义寄存器、字段、寄存器块和地址映射 |
-| `dma_axil_reg_adapter.sv` | 将UVM通用寄存器操作转换成AXI-Lite transaction |
-| `dma_ral_base_seq.sv` | 提供RAL frontdoor读写、提交descriptor和读取completion的辅助任务 |
+| `tb/uvm/ral/dma_reg_model.sv` | Defines fields, 14 registers, and the 4-byte little-endian frontdoor map. |
+| `tb/uvm/ral/dma_axil_reg_adapter.sv` | Converts between `uvm_reg_bus_op` and `axil_item`. |
+| `tb/uvm/sequences/dma_ral_base_seq.sv` | Provides shared RAL access, descriptor submission, completion read, and completion-pop helpers. |
+| `tb/uvm/agents/axil/axil_monitor.sv` | Publishes completed AXI4-Lite transactions. |
+| `tb/uvm/env/dma_env.sv` | Connects the `uvm_reg_predictor` so observed bus traffic updates the mirror. |
 
-## 寄存器地址映射
+Automatic RAL prediction is disabled. Mirror state follows transactions observed on the AXI4-Lite bus.
 
-DMA AXI-Lite寄存器默认使用32位数据、4字节地址步长和小端映射。
+## 2. Register Map
 
-| RAL名称 | RTL名称 | 地址 | 访问属性 | 作用 | 备注 |
-|---|---|---:|---|---|---|
-| `ral.control` | `REG_CONTROL` | `0x00` | RW/WO字段 | 配置IRQ使能并清除sticky状态 | bit0=`irq_enable`；bit1=`clear_sticky`，写1产生一次清除命令 |
-| `ral.status` | `REG_STATUS` | `0x04` | RO | 读取DMA和FIFO状态 | 见 `STATUS字段` |
-| `ral.src_addr` | `REG_SRC_ADDR` | `0x08` | RW | 配置源内存起始字节地址 | 提交前写入；当前配置要求地址对齐 |
-| `ral.dst_addr` | `REG_DST_ADDR` | `0x0C` | RW | 配置目的内存起始字节地址 | 提交前写入；当前配置要求地址对齐 |
-| `ral.length` | `REG_LENGTH` | `0x10` | RW | 配置搬运字节数 | 不能为0；高位超宽数据会被判为非法descriptor |
-| `ral.tag` | `REG_TAG` | `0x14` | RW | 配置descriptor任务标签 | 完成记录中返回，用于匹配任务 |
-| `ral.submit` | `REG_SUBMIT` | `0x18` | WO | 将当前配置提交到Request FIFO | bit0写1触发一次提交；属于W1P命令 |
-| `ral.comp_tag` | `REG_COMP_TAG` | `0x1C` | RO | 读取Completion FIFO队首TAG | FIFO为空时返回0；读取不会自动pop |
-| `ral.comp_length` | `REG_COMP_LENGTH` | `0x20` | RO | 读取队首记录的实际写入长度 | FIFO为空时返回0 |
-| `ral.comp_status` | `REG_COMP_STATUS` | `0x24` | RO | 读取队首记录的错误和一致性状态 | `[3:0]`读错误；`[7:4]`写错误；`[10:8]`为length/wrtag/rdtag mismatch标志 |
-| `ral.comp_pop` | `REG_COMP_POP` | `0x28` | WO | 弹出Completion FIFO队首记录 | bit0写1触发一次pop；属于W1P命令 |
-| `ral.queue_levels` | `REG_QUEUE_LEVELS` | `0x2C` | RO | 读取Request FIFO和Completion FIFO深度 | 低位为request level；高半字为completion level |
-| `ral.submitted_count` | `REG_SUBMITTED_COUNT` | `0x30` | RO | 读取成功提交的descriptor数量 | 32位累计计数器，复位清零 |
-| `ral.completed_count` | `REG_COMPLETED_COUNT` | `0x34` | RO | 读取已完成descriptor数量 | 32位累计计数器，复位清零 |
+All registers are 32 bits wide and use a 4-byte address stride.
 
-## STATUS字段
+| RAL handle | RTL address | Offset | Access | Reset | Description |
+|---|---|---:|---|---:|---|
+| `ral.control` | `REG_CONTROL` | `0x00` | RW / WO | `0x0000_0000` | Bit 0 is `irq_enable`; bit 1 is the `clear_sticky` write-one pulse. |
+| `ral.status` | `REG_STATUS` | `0x04` | RO | Dynamic | DMA, FIFO, IRQ, and sticky status. |
+| `ral.src_addr` | `REG_SRC_ADDR` | `0x08` | RW | `0x0000_0000` | Staged descriptor source byte address. |
+| `ral.dst_addr` | `REG_DST_ADDR` | `0x0C` | RW | `0x0000_0000` | Staged descriptor destination byte address. |
+| `ral.length` | `REG_LENGTH` | `0x10` | RW | `0x0000_0000` | Staged descriptor byte length. |
+| `ral.tag` | `REG_TAG` | `0x14` | RW | `0x0000_0000` | Staged software tag. |
+| `ral.submit` | `REG_SUBMIT` | `0x18` | WO | `0x0000_0000` | Writing bit 0 as one emits one submit pulse. |
+| `ral.comp_tag` | `REG_COMP_TAG` | `0x1C` | RO | Dynamic | Completion-head TAG; reads zero when empty. |
+| `ral.comp_length` | `REG_COMP_LENGTH` | `0x20` | RO | Dynamic | Completion-head actual write length; reads zero when empty. |
+| `ral.comp_status` | `REG_COMP_STATUS` | `0x24` | RO | Dynamic | Completion-head error codes and consistency flags; reads zero when empty. |
+| `ral.comp_pop` | `REG_COMP_POP` | `0x28` | WO | `0x0000_0000` | Writing bit 0 as one pops one completion. |
+| `ral.queue_levels` | `REG_QUEUE_LEVELS` | `0x2C` | RO | Dynamic | Request level in `[15:0]`; completion level in `[31:16]`. |
+| `ral.submitted_count` | `REG_SUBMITTED_COUNT` | `0x30` | RO | `0x0000_0000` | Number of descriptors accepted. |
+| `ral.completed_count` | `REG_COMPLETED_COUNT` | `0x34` | RO | `0x0000_0000` | Number of completion records committed. |
 
-`ral.status.read()`返回32位状态值。当前RTL中的字段为：
+## 3. `CONTROL` Fields
 
-| 位 | RAL字段 | 含义 |
+| Bit | RAL field | Access | Behavior |
+|---:|---|---|---|
+| 0 | `irq_enable` | RW | Updates only when `WSTRB[0]` is active. |
+| 1 | `clear_sticky` | WO | `WSTRB[0] && WDATA[1]` creates a one-cycle clear event; the value is not stored. |
+
+`SUBMIT.command` and `COMP_POP.command` are also bit-0 WO write-one pulse fields. Writing zero or masking byte lane 0 creates no operation.
+
+## 4. `STATUS` Fields
+
+| Bit | RAL field | Meaning |
 |---:|---|---|
-| 0 | `active` | DMA当前正在执行descriptor |
-| 1 | `req_empty` | Request FIFO为空 |
-| 2 | `req_full` | Request FIFO已满 |
-| 3 | `submit_ready` | 当前可以接受新的descriptor |
-| 4 | `comp_valid` | Completion FIFO非空，有完成记录可读取 |
-| 5 | `comp_full` | Completion FIFO已满 |
-| 6 | `irq` | 当前IRQ状态 |
-| 7 | `reject_full_sticky` | 曾经因为Request FIFO满而拒绝提交 |
-| 8 | `reject_invalid_sticky` | 曾经因为descriptor非法而拒绝提交 |
-| 9 | `status_mismatch_sticky` | 曾经检测到TAG或长度不一致 |
-| 10 | `pop_empty_sticky` | 曾经尝试从空Completion FIFO弹出 |
+| 0 | `active` | A descriptor is currently active. |
+| 1 | `req_empty` | The Request FIFO is empty. |
+| 2 | `req_full` | The Request FIFO is full. |
+| 3 | `submit_ready` | The manager can accept another valid descriptor. |
+| 4 | `comp_valid` | The Completion FIFO is non-empty. |
+| 5 | `comp_full` | The Completion FIFO is full. |
+| 6 | `irq` | Current IRQ output level. |
+| 7 | `reject_full_sticky` | A submission was rejected because the Request FIFO was full. |
+| 8 | `reject_invalid_sticky` | An invalid descriptor was rejected. |
+| 9 | `status_mismatch_sticky` | A returned TAG or length mismatch was detected. |
+| 10 | `pop_empty_sticky` | Software attempted to pop an empty Completion FIFO. |
+
+Bits `[31:11]` read as zero. `CONTROL.clear_sticky` clears bits `[10:7]` together.
+
+## 5. `COMP_STATUS` Fields
+
+| Bits | RAL field | Meaning |
+|---|---|---|
+| `[3:0]` | `read_error` | DMA read-status error code. |
+| `[7:4]` | `write_error` | DMA write-status error code. |
+| 8 | `read_tag_mismatch` | Returned read TAG differs from the active descriptor TAG. |
+| 9 | `write_tag_mismatch` | Returned write TAG differs from the active descriptor TAG. |
+| 10 | `length_mismatch` | Returned write length differs from the requested length. |
+
+Bits `[31:11]` read as zero.
+
+## 6. Access and Prediction Rules
+
+- `SRC_ADDR`, `DST_ADDR`, `LENGTH`, and `TAG` support byte-granular WSTRB updates.
+- Writes to RO registers complete normally on the bus but do not change architectural state.
+- Reads of WO command registers return zero.
+- Unimplemented addresses read as zero; writes have no architectural side effect.
+- Descriptor width and validity checks occur when SUBMIT is written. RAL deliberately preserves all 32 staging bits so tests can verify rejection of over-width values.
+- Reading completion-head fields does not pop the queue. Software must separately write `COMP_POP[0]=1`.

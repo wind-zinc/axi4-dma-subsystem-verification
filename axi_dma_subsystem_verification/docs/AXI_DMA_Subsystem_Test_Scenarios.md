@@ -4,6 +4,8 @@
 
 The no-argument launcher maintains 31 concrete tests. It compiles once, runs every test with a unique UVM test name and coverage identity, merges the results into one VDB, and generates one URG report.
 
+This catalogue describes the 31 tests in the `regression_tests` array of `sim/run_vcs_core_amd_vip.sh`.
+
 Every subsystem functional test derives from `dma_subsys_base_test`, starts a dedicated virtual sequence on `dma_subsys_virtual_sequencer`, and relies on the common environment for VIP startup, monitoring, RAL prediction, reference memory, scoreboard comparison, coverage, and watchdog behavior.
 
 The pass criteria for a functional test are:
@@ -14,8 +16,6 @@ The pass criteria for a functional test are:
 - all explicit sequence comparisons pass;
 - the scoreboard has no unmatched intent, active flow, leaked route, or incomplete byte comparison in `check_phase`; and
 - the process exits successfully.
-
-The URG dashboard alone does not prove that all tests passed. Always retain or inspect the regression summary and individual simulation logs.
 
 ## 2. Infrastructure tests
 
@@ -162,7 +162,7 @@ The URG dashboard alone does not prove that all tests passed. Always retain or i
 
 ### 4.5 `dma_subsys_axi_attribute_toggle_test`
 
-**Purpose:** Cover programmable external-master AXI attributes that must not be waived as DMA constants.
+**Purpose:** Cover programmable external-master AXI attributes independently from the DMA's fixed attributes.
 
 **Scenario:**
 
@@ -375,5 +375,5 @@ When adding a test, keep the scenario focused and observable:
 4. Add only the minimum test-control hook required for a defensive path and clear it in all exit paths.
 5. Give the scoreboard enough intent to distinguish success, expected error, completion, and IRQ behavior.
 6. Add the sequence include, concrete test file, `.f` entry, and maintained regression-list entry together.
-7. Run the new test alone, the relevant neighboring tests, and finally all 31 plus the new test.
+7. Run the new test alone, the relevant neighboring tests, and finally the complete maintained regression after adding the test to `regression_tests`.
 8. Review coverage object names, not only dashboard percentages, before claiming that the new scenario closed its target.

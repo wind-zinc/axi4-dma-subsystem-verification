@@ -1,4 +1,6 @@
-# AMD AXI VIP external dependency
+# AMD AXI VIP External Dependency
+
+This document matches the checked-in `sim/run_core_amd_vip.f`, static testbench, and launcher. The generated VIP tree is not part of the repository and must be supplied under the applicable AMD license.
 
 The AMD AXI VIP generated sources are intentionally excluded from this
 repository.  They are proprietary tool output and must be supplied locally by
@@ -31,23 +33,23 @@ The five generated instances are fixed by the static test top:
 | `ext_m0_vip`, `ext_m1_vip` | AXI4 masters | 32 / 32 / 4 |
 | `mem0_vip`, `mem1_vip` | AXI4 slaves | 32 / 32 / 6 |
 
-The launcher uses `sim/run_core_amd_vip.f` as the only active project file
-list. With no simulation arguments it defaults to the functional smoke test:
+The launcher uses `sim/run_core_amd_vip.f` as the active project file list.
+With no `+UVM_TESTNAME` argument it compiles once, runs the maintained 31-test regression, merges coverage, and invokes URG:
 
 ```bash
 chmod +x sim/run_vcs_core_amd_vip.sh
 sim/run_vcs_core_amd_vip.sh
 ```
 
-The equivalent explicit command is:
+To run only the infrastructure smoke test, select it explicitly:
 
 ```bash
 sim/run_vcs_core_amd_vip.sh +UVM_TESTNAME=amd_axi_vip_smoke_test
 ```
 
-Both commands start all five VIP agents, read both AXI-Lite channel windows,
-then perform independent write/readback operations through `ext_m0 -> mem0`
-and `ext_m1 -> mem1`.
+The smoke test starts all five VIP agents, reads both AXI-Lite channel windows,
+then performs independent write/readback operations through `ext_m0 -> mem0`
+and `ext_m1 -> mem1`. The no-argument command additionally runs the other 30 maintained tests and generates the merged report.
 
 To compile and elaborate without starting a simulation, use:
 
@@ -55,9 +57,7 @@ To compile and elaborate without starting a simulation, use:
 COMPILE_ONLY=1 sim/run_vcs_core_amd_vip.sh
 ```
 
-Do not start the generated `simv` without a UVM test. Inactive VIP agents can
-leave interface outputs at `X`, and the AMD protocol checker correctly treats
-unknown AXI control signals after reset as fatal protocol violations.
+The generated `simv` is started through the launcher with a UVM test name. The launcher supplies each test name while orchestrating the default regression. Inactive VIP agents can leave interface outputs at `X`, which the AMD protocol checker reports as fatal after reset.
 
 An `AMD_AXI_VIP_SMOKE` UVM info message, with no UVM errors or fatals, proves
 that the exported VIP packages, static hierarchy and basic AXI paths are all
