@@ -4,7 +4,7 @@
 ![UVM](https://img.shields.io/badge/Methodology-UVM%201.2-7B42BC)
 ![Simulator](https://img.shields.io/badge/Simulator-VCS%20V--2023.12--SP2-00599C)
 ![IP regression](https://img.shields.io/badge/IP%20regression-28%20tests-2EA44F)
-![Subsystem regression](https://img.shields.io/badge/Subsystem%20regression-31%20tests-2EA44F)
+![Subsystem regression](https://img.shields.io/badge/Subsystem%20regression-32%20tests-2EA44F)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 This repository contains two complementary SystemVerilog/UVM verification projects for an AXI4 memory-to-memory DMA design:
@@ -14,7 +14,7 @@ This repository contains two complementary SystemVerilog/UVM verification projec
 
 The first project covers the DMA engine, descriptor manager, registers, data integrity, and error handling. The second extends that coverage to multi-initiator arbitration, cross-memory routing, concurrent completion ordering, subsystem IRQ behavior, reset/abort interaction, and integration-level fault handling.
 
-Both regressions pass with Synopsys VCS/URG `V-2023.12-SP2`: the 28-test IP regression reaches **96.76%** overall coverage, and the 31-test subsystem regression reaches **95.93%**. Detailed metrics and reports are available in [Verification results](#7-verification-results).
+The recorded Synopsys VCS/URG `V-2023.12-SP2` baselines passed: the 28-test IP regression reached **96.76%** overall coverage, and the 31-test subsystem regression reached **95.93%**. Detailed metrics and reports are available in [Verification results](#7-verification-results). The maintained subsystem suite now contains 32 tests, including an independent IRQ state model and a multi-master random stress test. The recorded coverage results predate these additions.
 
 ## 1. Verification levels at a glance
 
@@ -60,7 +60,7 @@ flowchart LR
     ├── README.md
     ├── rtl/                         Two-channel subsystem and vendored interconnect RTL
     ├── tb/                          AMD-VIP UVM environment, SVA, tests
-    ├── sim/                         VCS/URG 31-test launcher and coverage hierarchy
+    ├── sim/                         VCS/URG 32-test launcher, multi-seed stress flow
     └── docs/                        Scenarios, VIP dependency, waiver rationale, results
 ```
 
@@ -264,20 +264,22 @@ The static testbench uses five generated AMD/Xilinx AXI VIP instances:
 | Memory target 0 | Slave-memory |
 | Memory target 1 | Slave-memory |
 
-The launcher loads the generated VIP bundle through `AXI_VIP_HOME`, which defaults to `${HOME}/Desktop/verify_study/vip`. See [`amd_axi_vip_external_dependency.md`](axi_dma_subsystem_verification/docs/amd_axi_vip_external_dependency.md) for the Vivado 2022.2 bundle layout and interface configurations.
+The launcher loads the generated VIP bundle through `AXI_VIP_HOME`, which defaults to `${HOME}/Desktop/verify_study/vip`. See [`AMD_axi_vip_external_dependency.md`](axi_dma_subsystem_verification/docs/AMD_axi_vip_external_dependency.md) for the Vivado 2022.2 bundle layout and interface configurations.
 
 The project-owned UVM environment contains the VIP manager, deterministic memory-behavior controller, AXI4-Lite sequencer/driver, virtual sequencer, command/route/IRQ monitors, VIP transaction adapter, RAL adapter and passive predictor, sparse reference model, scoreboard, functional coverage, and watchdog. Default bounds are a 2,000-cycle VIP timeout, 1,000 status polls, a 200,000-cycle global watchdog, and a 4,096-cycle route wait.
 
 The scoreboard correlates three independent sources: sequence intent, observed VIP/internal activity, and expected reference-memory state. It checks accepted command fields and tags, widened crossbar-ID ownership, route acquisition/release, transferred bytes, completion order and result, abort classification, register-visible state, and IRQ. Its `check_phase` also verifies that no intent, active flow, route ownership, or comparison remains unfinished.
 
-The 11 covergroups are `command_cg`, `intent_cg`, `register_cg`, `memory_cg`, `memory_protocol_cg`, `route_cg`, `completion_cg`, `completion_order_cg`, `irq_cg`, `fault_cg`, and `reset_cg`. Project SVA checks reset clearing, channel stability under stall, known payloads, legal sizes/bursts, FIXED/WRAP constraints, and the AXI 4-KiB rule. AMD VIP checks the AXI protocol.
+An independent cycle-based IRQ/status model predicts global pending/enables, completion/error counters, last-error and fault capture, IRQ outputs, and global AXI-Lite responses. Register checks also validate access permissions, response codes, error read data, and VERSION values; fault checks validate event source and code contracts.
+
+The 11 environment covergroups are `command_cg`, `intent_cg`, `register_cg`, `memory_cg`, `memory_protocol_cg`, `route_cg`, `completion_cg`, `completion_order_cg`, `irq_cg`, `fault_cg`, and `reset_cg`. The random stress sequence adds descriptor and concurrency covergroups. Project SVA checks reset clearing, channel stability under stall, known payloads, legal sizes/bursts, FIXED/WRAP constraints, and the AXI 4-KiB rule. AMD VIP checks the AXI protocol.
 
 ### 4.4 Subsystem regression inventory
 
-The subsystem regression includes 31 tests:
+The subsystem regression includes 32 tests:
 
 <details>
-<summary>Show all 31 subsystem-level tests</summary>
+<summary>Show all 32 subsystem-level tests</summary>
 
 - Infrastructure: `amd_axi_vip_smoke_test`, `dma_subsys_vip_manager_smoke_test`, `dma_subsys_env_smoke_test`, `dma_subsys_ral_smoke_test`.
 - Nominal DMA/order/route: `dma_subsys_ch0_to_ch1_test`, `dma_subsys_ch1_to_ch0_test`, `dma_subsys_crossbar_path_matrix_test`, `dma_subsys_completion_reorder_test`, `dma_subsys_completion_order_reverse_test`, `dma_subsys_route_contention_test`.
@@ -286,10 +288,13 @@ The subsystem regression includes 31 tests:
 - Error/fault/abort: `dma_subsys_descriptor_error_test`, `dma_subsys_memory_response_error_test`, `dma_subsys_status_fault_injection_test`, `dma_subsys_status_fault_expansion_test`, `dma_subsys_abort_timing_test`, `dma_subsys_abort_phase_matrix_test`.
 - IRQ/reset: `dma_subsys_irq_mask_multi_pending_test`, `dma_subsys_irq_status_separation_test`, `dma_subsys_reset_recovery_test`, `dma_subsys_fsm_reset_arc_test`.
 - Counter/tag rollover: `dma_subsys_tag_counter_rollover_test`, `dma_subsys_legal_tag_rollover_test`.
+- Random multi-master stress: `dma_subsys_random_stress_test`.
 
 </details>
 
 The scenarios cover both DMA directions, all crossbar source/target paths, route contention, completion reordering, legal lengths through 65,536 bytes, FIXED/INCR/WRAP external traffic including 256-beat cases where legal, WSTRB/timing policy, malformed/errored traffic, IRQ masking and simultaneous pending causes, reset arcs, abort phases, and counter/tag rollover.
+
+The stress test runs two independent DMA command streams with concurrent EXT0/EXT1 traffic, randomized RAM/routing/length/tag choices, memory backpressure and latency, IRQ mask/clear activity, invalid descriptors, and read/write response-error combinations. It checks destination data and guards, command/completion/error counts, independent IRQ state, route release, and observed concurrent activity.
 
 ### 4.5 Running the subsystem verification
 
@@ -302,7 +307,7 @@ chmod +x run_vcs_core_amd_vip.sh
 # Optional when the generated VIP tree is not at the launcher's default path
 export AXI_VIP_HOME=/absolute/path/to/generated/vip
 
-# Default: compile once, run all 31 maintained tests, merge coverage, run URG
+# Default: compile once, run all 32 maintained tests, merge coverage, run URG
 ./run_vcs_core_amd_vip.sh
 
 # One named test
@@ -310,6 +315,15 @@ export AXI_VIP_HOME=/absolute/path/to/generated/vip
 
 # Explicit infrastructure smoke test
 ./run_vcs_core_amd_vip.sh +UVM_TESTNAME=amd_axi_vip_smoke_test
+
+# Standalone IRQ model and five checker-mutation cases
+bash run_irq_model_checks.sh
+
+# Multi-seed random stress; coverage disabled by default
+bash run_random_stress.sh
+
+# Multi-seed stress with cumulative coverage
+COVERAGE=1 STRESS_SEEDS="17 81 2026 4096 65537" bash run_random_stress.sh
 
 # Report an existing VDB only
 COV_DIR=/absolute/path/to/regression_timestamp.vdb \
@@ -320,7 +334,9 @@ URG_ONLY=1 \
 COVERAGE_EL= ./run_vcs_core_amd_vip.sh
 ```
 
-With no arguments, the launcher compiles once, runs all 31 tests, assigns each test a unique coverage name, prints a regression summary, merges the VDB, and invokes URG. It also supports `COMPILE_ONLY`, `REUSE_COMPILED_SIMV`, `URG_ONLY`, `SKIP_URG`, `COVERAGE`, `COVERAGE_EL`, `COV_DIR`, and `REPORT_DIR` controls.
+With no arguments, the launcher compiles once, runs all 32 tests, assigns each test a unique coverage name, prints a regression summary, merges the VDB, and invokes URG. It also supports `COMPILE_ONLY`, `REUSE_COMPILED_SIMV`, `URG_ONLY`, `SKIP_URG`, `COVERAGE`, `COVERAGE_EL`, `COV_DIR`, and `REPORT_DIR` controls.
+
+The stress launcher compiles once and records separate seed logs plus `results.tsv`. Its default seeds are `17 81 2026 4096 65537`, with 450 DMA commands per seed under the default configuration. The October 13, 2026 run summary records PASS for all five seeds. The recorded 31-test coverage baseline remains unchanged; it predates the IRQ model and stress test additions.
 
 ## 5. Verification architecture
 
@@ -416,9 +432,9 @@ Source lists are defined in `axi_dma_ip_verification/sim/run_uvm.f` and `axi_dma
 
 - [Project README](axi_dma_subsystem_verification/README.md) — setup, quick start, verification environment, and documentation entry points.
 - [RTL specification](axi_dma_subsystem_verification/docs/rtl_spec.md) — subsystem hierarchy, interfaces, registers, datapaths, state machines, errors, interrupts, and reset behavior.
-- [Complete test scenarios](axi_dma_subsystem_verification/docs/AXI_DMA_Subsystem_Test_Scenarios.md) — setup, actions, checks, and pass criteria for all 31 tests.
+- [Baseline test scenarios](axi_dma_subsystem_verification/docs/AXI_DMA_Subsystem_Test_Scenarios.md) — setup, actions, checks, and pass criteria for the original 31 tests; the random stress test is described in the project README.
 - [Coverage-waiver rationale](axi_dma_subsystem_verification/docs/AXI_DMA_Subsystem_Coverage_Waiver_Rationale.md) — exclusion inventory and reachability rationale.
-- [AMD AXI VIP dependency](axi_dma_subsystem_verification/docs/amd_axi_vip_external_dependency.md) — external generated-source layout, modes, and launcher behavior.
+- [AMD AXI VIP dependency](axi_dma_subsystem_verification/docs/AMD_axi_vip_external_dependency.md) — external generated-source layout and modes; the current launcher uses 32 maintained tests.
 - [AXI4-Lite crossbar fix](axi_dma_subsystem_verification/docs/RTL_fix_intro.md) — local DECERR/W-handshake correction.
 - [Coverage dashboard](axi_dma_subsystem_verification/docs/Coverage_report.png) — 31-test merged coverage report.
 - [Final functional-verification report](axi_dma_subsystem_verification/docs/AXI4_DMA_Subsystem_Functional_Verification_Report.md) — 31-test subsystem closure report.
