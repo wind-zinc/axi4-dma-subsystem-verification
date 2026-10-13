@@ -1,3 +1,5 @@
+`timescale 1ns / 1ps
+
 // Drives enough accepted commands to toggle the complete seven-bit hardware
 // tag sequence and the practically reachable low byte of all 32-bit command,
 // done, and error counters.  LEN_ZERO makes every command deterministic and
@@ -125,7 +127,7 @@ class dma_subsys_tag_counter_rollover_vseq extends dma_subsys_vseq_base;
             "CH1 global error count after tag rollover");
 
         // Reset supplies the falling edge for every reached tag/counter bit.
-        p_sequencer.test_ctrl_vif.pulse_reset(12);
+        p_sequencer.test_ctrl_vif.pulse_reset(20);
         wait_for_infrastructure();
         wait_probe_cycles(5);
     endtask

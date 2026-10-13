@@ -1,5 +1,5 @@
-`default_nettype none
 `timescale 1ns / 1ps
+`default_nettype none
 
 // Static integration point for the five AMD AXI VIP instances.  The VIP HDL
 // itself intentionally remains outside this repository; see
@@ -334,6 +334,48 @@ module tb_axi_dma_core_amd_vip;
     assign probe_if.fault_source =
         dut.u_irq_status_ctrl.fault_source_reg;
 
+    assign probe_if.irq_bus.awaddr = dut.axil_m_awaddr[2*AXIL_ADDR_WIDTH +: AXIL_BLOCK_ADDR_WIDTH];
+    assign probe_if.irq_bus.awvalid = dut.axil_m_awvalid[2];
+    assign probe_if.irq_bus.awready = dut.axil_m_awready[2];
+    assign probe_if.irq_bus.wdata = dut.axil_m_wdata[2*AXIL_DATA_WIDTH +: AXIL_DATA_WIDTH];
+    assign probe_if.irq_bus.wstrb = dut.axil_m_wstrb[2*AXIL_STRB_WIDTH +: AXIL_STRB_WIDTH];
+    assign probe_if.irq_bus.wvalid = dut.axil_m_wvalid[2];
+    assign probe_if.irq_bus.wready = dut.axil_m_wready[2];
+    assign probe_if.irq_bus.bvalid = dut.axil_m_bvalid[2];
+    assign probe_if.irq_bus.bready = dut.axil_m_bready[2];
+    assign probe_if.irq_bus.bresp = dut.axil_m_bresp[4 +: 2];
+    assign probe_if.irq_bus.araddr = dut.axil_m_araddr[2*AXIL_ADDR_WIDTH +: AXIL_BLOCK_ADDR_WIDTH];
+    assign probe_if.irq_bus.arvalid = dut.axil_m_arvalid[2];
+    assign probe_if.irq_bus.arready = dut.axil_m_arready[2];
+    assign probe_if.irq_bus.rvalid = dut.axil_m_rvalid[2];
+    assign probe_if.irq_bus.rready = dut.axil_m_rready[2];
+    assign probe_if.irq_bus.rdata = dut.axil_m_rdata[2*AXIL_DATA_WIDTH +: AXIL_DATA_WIDTH];
+    assign probe_if.irq_bus.rresp = dut.axil_m_rresp[4 +: 2];
+
+    assign probe_if.irq_inputs.reset_n = aresetn;
+    assign probe_if.irq_inputs.completion_valid = dut.completion_valid;
+    assign probe_if.irq_inputs.busy = subsys_busy;
+    assign probe_if.irq_inputs.route_active = dut.route_active;
+    assign probe_if.irq_inputs.route_matrix = dut.route_matrix;
+    assign probe_if.irq_inputs.manager_fault_valid = dut.manager_fault_valid;
+    assign probe_if.irq_inputs.manager_fault = dut.manager_fault;
+    assign probe_if.irq_inputs.route_fault_valid = dut.route_fault_valid;
+    assign probe_if.irq_inputs.route_fault.error = dut.route_fault_code;
+    assign probe_if.irq_inputs.route_fault.source = dut.route_fault_source;
+
+    assign probe_if.irq_observed.done_pending = probe_if.done_pending;
+    assign probe_if.irq_observed.error_pending = probe_if.error_pending;
+    assign probe_if.irq_observed.done_enable = probe_if.done_enable;
+    assign probe_if.irq_observed.error_enable = probe_if.error_enable;
+    assign probe_if.irq_observed.fault_pending = probe_if.fault_pending;
+    assign probe_if.irq_observed.fault_enable = probe_if.fault_enable;
+    assign probe_if.irq_observed.fault_code = probe_if.fault_code;
+    assign probe_if.irq_observed.fault_source = probe_if.fault_source;
+    assign probe_if.irq_observed.irq_ch = irq_ch;
+    assign probe_if.irq_observed.global_irq = irq;
+    assign probe_if.irq_observed.combined_fault_valid = dut.combined_fault_valid;
+    assign probe_if.irq_observed.combined_fault = dut.combined_fault;
+
     generate
         for (genvar probe_channel = 0;
                 probe_channel < DMA_CH_COUNT; probe_channel++) begin : g_probe
@@ -347,6 +389,14 @@ module tb_axi_dma_core_amd_vip;
             };
             assign probe_if.completion[probe_channel] =
                 dut.completion[probe_channel];
+            assign probe_if.irq_inputs.completion_error[probe_channel] =
+                dut.completion[probe_channel].error;
+            assign probe_if.irq_observed.last_error[probe_channel] =
+                dut.u_irq_status_ctrl.last_error_reg[probe_channel];
+            assign probe_if.irq_observed.done_count[probe_channel] =
+                dut.u_irq_status_ctrl.done_count_reg[probe_channel];
+            assign probe_if.irq_observed.error_count[probe_channel] =
+                dut.u_irq_status_ctrl.error_count_reg[probe_channel];
         end
     endgenerate
 

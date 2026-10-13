@@ -1,3 +1,5 @@
+`timescale 1ns / 1ps
+
 // Common services for subsystem virtual sequences.
 //
 // This class drives only public AMD VIP APIs and the virtual sequencer's
@@ -48,7 +50,7 @@ class dma_subsys_vseq_base extends uvm_sequence #(uvm_sequence_item);
         end
     endtask
 
-    protected task axil_write32(
+    protected virtual task axil_write32(
         input logic [AXIL_ADDR_WIDTH-1:0] address,
         input logic [AXIL_DATA_WIDTH-1:0] value,
         input string                     operation
@@ -93,7 +95,7 @@ class dma_subsys_vseq_base extends uvm_sequence #(uvm_sequence_item);
         end
     endtask
 
-    protected task axil_read32(
+    protected virtual task axil_read32(
         input  logic [AXIL_ADDR_WIDTH-1:0] address,
         output logic [AXIL_DATA_WIDTH-1:0] value,
         input  string                     operation
@@ -139,7 +141,7 @@ class dma_subsys_vseq_base extends uvm_sequence #(uvm_sequence_item);
         value = data[AXIL_DATA_WIDTH-1:0];
     endtask
 
-    protected task external_write(
+    protected virtual task external_write(
         input dma_master_e                    master,
         input logic [AXI_ADDR_WIDTH-1:0]      address,
         input int unsigned                    beat_count,
@@ -164,44 +166,48 @@ class dma_subsys_vseq_base extends uvm_sequence #(uvm_sequence_item);
         response = XIL_AXI_RESP_DECERR;
         completed = 1'b0;
 
-        fork : external_write_guard
+        fork
             begin
-                case (master)
-                    DMA_MASTER_EXT0: begin
-                        p_sequencer.vip_mgr.ext_m0.AXI4_WRITE_BURST(
-                            0, address, xil_axi_len_t'(beat_count - 1),
-                            xil_axi_size_t'($clog2(AXI_STRB_WIDTH)),
-                            XIL_AXI_BURST_TYPE_INCR,
-                            XIL_AXI_ALOCK_NOLOCK, xil_axi_cache_t'(0),
-                            XIL_AXI_PROT_NORMAL_ACCESS_MASK,
-                            xil_axi_region_t'(0), xil_axi_qos_t'(0),
-                            '0, payload, write_user, response);
+                fork
+                    begin
+                        case (master)
+                            DMA_MASTER_EXT0: begin
+                                p_sequencer.vip_mgr.ext_m0.AXI4_WRITE_BURST(
+                                    0, address, xil_axi_len_t'(beat_count - 1),
+                                    xil_axi_size_t'($clog2(AXI_STRB_WIDTH)),
+                                    XIL_AXI_BURST_TYPE_INCR,
+                                    XIL_AXI_ALOCK_NOLOCK, xil_axi_cache_t'(0),
+                                    XIL_AXI_PROT_NORMAL_ACCESS_MASK,
+                                    xil_axi_region_t'(0), xil_axi_qos_t'(0),
+                                    '0, payload, write_user, response);
+                            end
+                            DMA_MASTER_EXT1: begin
+                                p_sequencer.vip_mgr.ext_m1.AXI4_WRITE_BURST(
+                                    0, address, xil_axi_len_t'(beat_count - 1),
+                                    xil_axi_size_t'($clog2(AXI_STRB_WIDTH)),
+                                    XIL_AXI_BURST_TYPE_INCR,
+                                    XIL_AXI_ALOCK_NOLOCK, xil_axi_cache_t'(0),
+                                    XIL_AXI_PROT_NORMAL_ACCESS_MASK,
+                                    xil_axi_region_t'(0), xil_axi_qos_t'(0),
+                                    '0, payload, write_user, response);
+                            end
+                            default: begin
+                                `uvm_fatal(
+                                    "VSEQ_AXI_MASTER",
+                                    $sformatf(
+                                        "%s requires EXT0 or EXT1, got %0d",
+                                        operation, master))
+                            end
+                        endcase
+                        completed = 1'b1;
                     end
-                    DMA_MASTER_EXT1: begin
-                        p_sequencer.vip_mgr.ext_m1.AXI4_WRITE_BURST(
-                            0, address, xil_axi_len_t'(beat_count - 1),
-                            xil_axi_size_t'($clog2(AXI_STRB_WIDTH)),
-                            XIL_AXI_BURST_TYPE_INCR,
-                            XIL_AXI_ALOCK_NOLOCK, xil_axi_cache_t'(0),
-                            XIL_AXI_PROT_NORMAL_ACCESS_MASK,
-                            xil_axi_region_t'(0), xil_axi_qos_t'(0),
-                            '0, payload, write_user, response);
+                    begin
+                        wait_probe_cycles(p_sequencer.cfg.vip_timeout_cycles);
                     end
-                    default: begin
-                        `uvm_fatal(
-                            "VSEQ_AXI_MASTER",
-                            $sformatf(
-                                "%s requires EXT0 or EXT1, got %0d",
-                                operation, master))
-                    end
-                endcase
-                completed = 1'b1;
+                join_any
+                disable fork;
             end
-            begin
-                wait_probe_cycles(p_sequencer.cfg.vip_timeout_cycles);
-            end
-        join_any
-        disable external_write_guard;
+        join
 
         if (!completed) begin
             `uvm_fatal(
@@ -219,7 +225,7 @@ class dma_subsys_vseq_base extends uvm_sequence #(uvm_sequence_item);
         end
     endtask
 
-    protected task external_read(
+    protected virtual task external_read(
         input  dma_master_e                   master,
         input  logic [AXI_ADDR_WIDTH-1:0]     address,
         input  int unsigned                   beat_count,
@@ -245,44 +251,48 @@ class dma_subsys_vseq_base extends uvm_sequence #(uvm_sequence_item);
         end
         completed = 1'b0;
 
-        fork : external_read_guard
+        fork
             begin
-                case (master)
-                    DMA_MASTER_EXT0: begin
-                        p_sequencer.vip_mgr.ext_m0.AXI4_READ_BURST(
-                            0, address, xil_axi_len_t'(beat_count - 1),
-                            xil_axi_size_t'($clog2(AXI_STRB_WIDTH)),
-                            XIL_AXI_BURST_TYPE_INCR,
-                            XIL_AXI_ALOCK_NOLOCK, xil_axi_cache_t'(0),
-                            XIL_AXI_PROT_NORMAL_ACCESS_MASK,
-                            xil_axi_region_t'(0), xil_axi_qos_t'(0),
-                            '0, payload, response, read_user);
+                fork
+                    begin
+                        case (master)
+                            DMA_MASTER_EXT0: begin
+                                p_sequencer.vip_mgr.ext_m0.AXI4_READ_BURST(
+                                    0, address, xil_axi_len_t'(beat_count - 1),
+                                    xil_axi_size_t'($clog2(AXI_STRB_WIDTH)),
+                                    XIL_AXI_BURST_TYPE_INCR,
+                                    XIL_AXI_ALOCK_NOLOCK, xil_axi_cache_t'(0),
+                                    XIL_AXI_PROT_NORMAL_ACCESS_MASK,
+                                    xil_axi_region_t'(0), xil_axi_qos_t'(0),
+                                    '0, payload, response, read_user);
+                            end
+                            DMA_MASTER_EXT1: begin
+                                p_sequencer.vip_mgr.ext_m1.AXI4_READ_BURST(
+                                    0, address, xil_axi_len_t'(beat_count - 1),
+                                    xil_axi_size_t'($clog2(AXI_STRB_WIDTH)),
+                                    XIL_AXI_BURST_TYPE_INCR,
+                                    XIL_AXI_ALOCK_NOLOCK, xil_axi_cache_t'(0),
+                                    XIL_AXI_PROT_NORMAL_ACCESS_MASK,
+                                    xil_axi_region_t'(0), xil_axi_qos_t'(0),
+                                    '0, payload, response, read_user);
+                            end
+                            default: begin
+                                `uvm_fatal(
+                                    "VSEQ_AXI_MASTER",
+                                    $sformatf(
+                                        "%s requires EXT0 or EXT1, got %0d",
+                                        operation, master))
+                            end
+                        endcase
+                        completed = 1'b1;
                     end
-                    DMA_MASTER_EXT1: begin
-                        p_sequencer.vip_mgr.ext_m1.AXI4_READ_BURST(
-                            0, address, xil_axi_len_t'(beat_count - 1),
-                            xil_axi_size_t'($clog2(AXI_STRB_WIDTH)),
-                            XIL_AXI_BURST_TYPE_INCR,
-                            XIL_AXI_ALOCK_NOLOCK, xil_axi_cache_t'(0),
-                            XIL_AXI_PROT_NORMAL_ACCESS_MASK,
-                            xil_axi_region_t'(0), xil_axi_qos_t'(0),
-                            '0, payload, response, read_user);
+                    begin
+                        wait_probe_cycles(p_sequencer.cfg.vip_timeout_cycles);
                     end
-                    default: begin
-                        `uvm_fatal(
-                            "VSEQ_AXI_MASTER",
-                            $sformatf(
-                                "%s requires EXT0 or EXT1, got %0d",
-                                operation, master))
-                    end
-                endcase
-                completed = 1'b1;
+                join_any
+                disable fork;
             end
-            begin
-                wait_probe_cycles(p_sequencer.cfg.vip_timeout_cycles);
-            end
-        join_any
-        disable external_read_guard;
+        join
 
         if (!completed) begin
             `uvm_fatal(

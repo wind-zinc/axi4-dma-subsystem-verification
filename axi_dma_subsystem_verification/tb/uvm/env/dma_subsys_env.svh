@@ -1,3 +1,5 @@
+`timescale 1ns / 1ps
+
 class dma_subsys_env extends uvm_env;
     `uvm_component_utils(dma_subsys_env)
 
@@ -6,6 +8,7 @@ class dma_subsys_env extends uvm_env;
     dma_subsys_cmd_monitor              cmd_monitor;
     dma_subsys_route_monitor            route_monitor;
     dma_subsys_irq_monitor              irq_monitor;
+    dma_subsys_irq_state_checker        irq_state_checker;
     dma_subsys_vip_transaction_adapter  vip_transaction_adapter;
     dma_subsys_ref_model                reference_model;
     dma_subsys_scoreboard               scoreboard;
@@ -53,6 +56,8 @@ class dma_subsys_env extends uvm_env;
             "route_monitor", this);
         irq_monitor = dma_subsys_irq_monitor::type_id::create(
             "irq_monitor", this);
+        irq_state_checker = dma_subsys_irq_state_checker::type_id::create(
+            "irq_state_checker", this);
         vip_transaction_adapter =
             dma_subsys_vip_transaction_adapter::type_id::create(
                 "vip_transaction_adapter", this);

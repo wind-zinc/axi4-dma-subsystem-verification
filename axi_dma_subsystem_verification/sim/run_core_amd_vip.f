@@ -10,6 +10,7 @@
 +incdir+../tb/sva
 
 ../rtl/dma_subsystem_pkg.sv
+../tb/uvm/common/dma_subsys_irq_model_pkg.sv
 ../tb/uvm/common/dma_subsys_tr_pkg.sv
 ../tb/uvm/agents/amd_axi_vip/dma_subsys_vip_pkg.sv
 ../tb/uvm/agents/dma_subsys_probe/dma_subsys_probe_if.sv
@@ -77,4 +78,5 @@
 ../tb/uvm/tests/dma_subsys_fsm_reset_arc_test.sv
 ../tb/uvm/tests/dma_subsys_bus_toggle_closure_test.sv
 ../tb/uvm/tests/dma_subsys_legal_tag_rollover_test.sv
+../tb/uvm/tests/dma_subsys_random_stress_test.sv
 ../tb/uvm/tests/amd_axi_vip_smoke_test.sv

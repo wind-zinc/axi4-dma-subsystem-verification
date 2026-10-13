@@ -1,3 +1,5 @@
+`timescale 1ns / 1ps
+
 class dma_subsys_expected_flow extends uvm_object;
     `uvm_object_utils(dma_subsys_expected_flow)
 
@@ -263,7 +265,59 @@ class dma_subsys_scoreboard extends uvm_component;
     endfunction
 
     virtual function void write_reg(input dma_subsys_reg_tr tr);
+        dma_ctrl_block_e block;
+        logic [AXIL_BLOCK_ADDR_WIDTH-1:0] offset;
+        dma_axi_resp_e expected_response;
+        bit legal_access;
+
         register_count++;
+        block = dma_ctrl_block_from_addr(tr.addr);
+        offset = tr.block_offset();
+        legal_access = 1'b0;
+
+        if (block == DMA_CTRL_UNMAPPED) begin
+            expected_response = DMA_AXI_DECERR;
+        end else begin
+            if (block == DMA_CTRL_GLOBAL) begin
+                if (tr.access == DMA_ACCESS_WRITE) begin
+                    legal_access = offset inside {REG_IRQ_ENABLE, REG_IRQ_CLEAR};
+                end else begin
+                    legal_access = offset inside {
+                        REG_IRQ_STATUS, REG_IRQ_ENABLE, REG_IRQ_LAST_ERROR,
+                        REG_CH0_DONE_COUNT, REG_CH1_DONE_COUNT,
+                        REG_CH0_ERROR_COUNT, REG_CH1_ERROR_COUNT,
+                        REG_ROUTE_STATUS, REG_GLOBAL_VERSION, REG_FAULT_STATUS};
+                end
+            end else begin
+                legal_access = offset inside {
+                    REG_CTRL, REG_SRC_ADDR, REG_DST_ADDR,
+                    REG_LENGTH, REG_ROUTE, REG_SW_TAG};
+                if (tr.access == DMA_ACCESS_READ) begin
+                    legal_access |= offset inside {
+                        REG_STATUS, REG_LAST_HW_TAG, REG_COMPLETED_LEN,
+                        REG_LAST_ERROR, REG_CMD_COUNT, REG_DONE_COUNT, REG_VERSION};
+                end
+            end
+            expected_response = legal_access ? DMA_AXI_OKAY : DMA_AXI_SLVERR;
+        end
+
+        if (tr.resp !== expected_response) begin
+            `uvm_error("SCB_REG_RESPONSE",
+                $sformatf("Expected response %0d: %s",
+                    expected_response, tr.convert2string()))
+        end
+        if (tr.access == DMA_ACCESS_READ) begin
+            if ((expected_response != DMA_AXI_OKAY) && (tr.data !== 32'd0)) begin
+                `uvm_error("SCB_REG_ERROR_DATA", tr.convert2string())
+            end
+            if (((block == DMA_CTRL_GLOBAL) && (offset == REG_GLOBAL_VERSION))
+                    || (((block == DMA_CTRL_CH0) || (block == DMA_CTRL_CH1))
+                        && (offset == REG_VERSION))) begin
+                if (tr.data !== VERSION_VALUE) begin
+                    `uvm_error("SCB_REG_VERSION", tr.convert2string())
+                end
+            end
+        end
     endfunction
 
     protected function dma_subsys_expected_flow find_write_flow(
@@ -728,6 +782,30 @@ class dma_subsys_scoreboard extends uvm_component;
 
     virtual function void write_fault(input dma_subsys_fault_tr tr);
         fault_count++;
+        if (tr.event_kind != DMA_FAULT_RAISED) begin
+            `uvm_error("SCB_FAULT_EVENT", tr.convert2string())
+        end
+        case (tr.source)
+            DMA_FAULT_SRC_RD0, DMA_FAULT_SRC_RD1,
+            DMA_FAULT_SRC_WR0, DMA_FAULT_SRC_WR1: begin
+                if (tr.error !== DMA_ERR_UNEXPECTED_STATUS) begin
+                    `uvm_error("SCB_FAULT_CODE", tr.convert2string())
+                end
+            end
+            DMA_FAULT_SRC_ROUTE: begin
+                if (tr.error !== DMA_ERR_ROUTE_CONFLICT) begin
+                    `uvm_error("SCB_FAULT_CODE", tr.convert2string())
+                end
+            end
+            DMA_FAULT_SRC_MANAGER: begin
+                if (tr.error !== DMA_ERR_INTERNAL) begin
+                    `uvm_error("SCB_FAULT_CODE", tr.convert2string())
+                end
+            end
+            default: begin
+                `uvm_error("SCB_FAULT_SOURCE", tr.convert2string())
+            end
+        endcase
     endfunction
 
     virtual function void write_reset(input dma_subsys_reset_tr tr);

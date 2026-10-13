@@ -6,7 +6,7 @@ The complete RTL architecture and register behavior are documented in [docs/rtl_
 
 ## Verification Status
 
-The maintained regression contains 31 tests. The merged Synopsys VCS/URG baseline was generated on August 9, 2026 with VCS/URG `V-2023.12-SP2`.
+The maintained regression contains 32 tests, including a multi-master random stress test. The recorded 31-test Synopsys VCS/URG baseline was generated on August 9, 2026 with VCS/URG `V-2023.12-SP2`.
 
 | Metric | Result |
 | --- | ---: |
@@ -22,6 +22,10 @@ The maintained regression contains 31 tests. The merged Synopsys VCS/URG baselin
 
 See the [functional verification report](docs/AXI4_DMA_Subsystem_Functional_Verification_Report.md) for results and the [coverage waiver rationale](docs/AXI_DMA_Subsystem_Coverage_Waiver_Rationale.md) for reviewed structural exclusions.
 
+The baseline above predates the independent IRQ state checker and random stress test. It does not include results for those additions.
+
+The October 13, 2026 random stress run summary records PASS for seeds `17`, `81`, `2026`, `4096`, and `65537`. These five seed results are separate from the recorded 31-test coverage baseline.
+
 ## Repository Layout
 
 ```text
@@ -30,10 +34,13 @@ axi_dma_subsystem_verification/
 |-- tb/
 |   |-- tb_axi_dma_core_amd_vip.sv
 |   |-- sva/                     Project protocol assertions
+|   |-- unit/                    Standalone IRQ model/controller tests
 |   `-- uvm/                     Agents, environment, RAL, sequences, and tests
 |-- sim/
 |   |-- run_core_amd_vip.f       VCS source list
 |   |-- run_vcs_core_amd_vip.sh  Compile, test, merge, and URG launcher
+|   |-- run_irq_model_checks.sh Standalone IRQ and checker-mutation regression
+|   |-- run_random_stress.sh    Compile-once multi-seed stress regression
 |   |-- cm_hier.cfg              Coverage hierarchy configuration
 |   `-- exclusions/              Reviewed structural exclusions
 `-- docs/                        RTL, test, coverage, dependency, and result documents
@@ -46,7 +53,7 @@ axi_dma_subsystem_verification/
 - UVM 1.2
 - AMD/Xilinx AXI VIP generated with Vivado 2022.2
 
-The generated VIP tree is selected with `AXI_VIP_HOME`. Its required layout is described in [docs/amd_axi_vip_external_dependency.md](docs/amd_axi_vip_external_dependency.md).
+The generated VIP tree is selected with `AXI_VIP_HOME`. Its required layout is described in [docs/AMD_axi_vip_external_dependency.md](docs/AMD_axi_vip_external_dependency.md).
 
 ## Running the Verification Environment
 
@@ -60,11 +67,36 @@ Run commands from the `sim` directory.
 
 The launcher compiles once, executes the maintained test list, merges coverage databases, and runs URG.
 
+### Standalone IRQ model regression
+
+```bash
+bash run_irq_model_checks.sh
+```
+
+This flow requires VCS but does not require UVM, URG, or AMD VIP. It runs directed and randomized controller traffic with three seeds, followed by five error-injection cases that must be detected by the checker.
+
 ### One test
 
 ```bash
 ./run_vcs_core_amd_vip.sh +UVM_TESTNAME=dma_subsys_ch0_to_ch1_test
 ```
+
+### Random stress
+
+```bash
+bash run_random_stress.sh
+```
+
+The default seeds are `17 81 2026 4096 65537`. Each seed runs 450 DMA commands, concurrent EXT0/EXT1 traffic, randomized memory backpressure and latency, IRQ mask/clear activity, invalid descriptors, and eight read/write response-error combinations. The test checks data and destination guards, command/completion/error counters, route release, and independent IRQ state. Activity counters require observed dual-channel operation, route contention, external traffic during DMA activity, and 4-KiB splits.
+
+```bash
+STRESS_SEEDS="17 81 2026" bash run_random_stress.sh \
+  +STRESS_DMA_PER_CH=500 +STRESS_ERROR_PAIRS=64
+
+COVERAGE=1 STRESS_SEEDS="17 81 2026" bash run_random_stress.sh
+```
+
+The launcher compiles once, records per-seed logs and `results.tsv`, and returns failure if any seed fails. Coverage is disabled by default; `COVERAGE=1` creates one cumulative VDB with distinct run names and a final URG report. A single seed can also be run with `run_vcs_core_amd_vip.sh +UVM_TESTNAME=dma_subsys_random_stress_test +ntb_random_seed=17`.
 
 ### URG from an existing coverage database
 
@@ -108,16 +140,17 @@ The main checking components are:
 
 - an independent sparse byte-addressable reference memory;
 - an end-to-end scoreboard for commands, routes, AXI traffic, completions, registers, and interrupts;
+- an independent cycle-based IRQ state model for pending/enables, counters, fault capture, IRQ outputs, and global AXI-Lite responses;
 - a UVM RAL model with passive bus prediction;
 - project SVA bound to both memory-side AXI interfaces;
 - AMD VIP protocol checking; and
-- 11 functional covergroups covering control, routing, memory traffic, completion, interrupt, fault, and reset behavior.
+- 11 environment covergroups covering control, routing, memory traffic, completion, interrupt, fault, and reset behavior, plus descriptor and concurrency covergroups in the random stress sequence.
 
 ## Tests and Coverage
 
-The regression covers environment startup, RAL access, bidirectional transfers, all legal crossbar paths, completion ordering, route contention, transfer-length boundaries, AXI burst forms and attributes, AXI-Lite policy and timing, descriptor rejection, response errors, internal faults, abort behavior, interrupt masking, reset recovery, and tag/counter rollover.
+The regression covers environment startup, RAL access, bidirectional transfers, all legal crossbar paths, completion ordering, route contention, transfer-length boundaries, AXI burst forms and attributes, AXI-Lite policy and timing, descriptor rejection, response errors, internal faults, abort behavior, interrupt masking, reset recovery, tag/counter rollover, and sustained randomized multi-master traffic.
 
-- [Test scenarios](docs/AXI_DMA_Subsystem_Test_Scenarios.md)
+- [Baseline test scenarios](docs/AXI_DMA_Subsystem_Test_Scenarios.md) — the original 31 tests; random stress is described above.
 - [Functional verification report](docs/AXI4_DMA_Subsystem_Functional_Verification_Report.md)
 - [Coverage waiver rationale](docs/AXI_DMA_Subsystem_Coverage_Waiver_Rationale.md)
 - [Coverage dashboard](docs/Coverage_report.png)

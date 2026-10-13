@@ -1,9 +1,11 @@
+`timescale 1ns / 1ps
 `default_nettype none
 
 package dma_subsys_env_pkg;
 
     import uvm_pkg::*;
     import dma_subsystem_pkg::*;
+    import dma_subsys_irq_model_pkg::*;
     import dma_subsys_tr_pkg::*;
     import dma_subsys_vip_pkg::*;
     import axi_vip_pkg::*;
@@ -20,10 +22,12 @@ package dma_subsys_env_pkg;
     `uvm_analysis_imp_decl(_reset)
 
     `include "dma_subsys_env_cfg.svh"
+    `include "dma_subsys_random_stress_cfg.svh"
     `include "dma_subsys_probe_monitor_base.svh"
     `include "dma_subsys_cmd_monitor.svh"
     `include "dma_subsys_route_monitor.svh"
     `include "dma_subsys_irq_monitor.svh"
+    `include "dma_subsys_irq_state_checker.svh"
     `include "dma_subsys_vip_transaction_adapter.svh"
     `include "dma_subsys_memory_behavior_controller.svh"
     `include "dma_subsys_axil_sequencer.svh"
@@ -36,6 +40,8 @@ package dma_subsys_env_pkg;
     `include "dma_subsys_watchdog.svh"
     `include "dma_subsys_virtual_sequencer.svh"
     `include "dma_subsys_vseq_base.svh"
+    `include "dma_subsys_random_stress_item.svh"
+    `include "dma_subsys_random_stress_vseq.svh"
     `include "dma_subsys_ral_smoke_vseq.svh"
     `include "dma_subsys_ch0_to_ch1_vseq.svh"
     `include "dma_subsys_completion_reorder_vseq.svh"

@@ -116,10 +116,11 @@ regression_tests=(
   "dma_subsys_fsm_reset_arc_test"
   "dma_subsys_bus_toggle_closure_test"
   "dma_subsys_legal_tag_rollover_test"
+  "dma_subsys_random_stress_test"
 )
 
 vip_smoke_test="amd_axi_vip_smoke_test"
-sim_args=("$@")
+sim_args=("-no_save" "$@")
 test_name=""
 
 for arg in "$@"; do
@@ -253,6 +254,7 @@ if [[ -z "${test_name}" ]]; then
 fi
 
 safe_test_name="${test_name//[^[:alnum:]_.-]/_}"
+cov_name="${COV_NAME:-${safe_test_name}}"
 run_stamp="${RUN_STAMP_OVERRIDE:-$(date +%Y%m%d_%H%M%S)}"
 sim_log="${SIM_LOG:-${build_dir}/sim_${safe_test_name}.log}"
 cov_dir="${COV_DIR:-${build_dir}/coverage/${safe_test_name}_${run_stamp}.vdb}"
@@ -505,7 +507,7 @@ if [[ "${coverage_enabled}" == "1" ]]; then
   "${build_dir}/simv" "${sim_args[@]}" \
     -cm "${coverage_metrics}" \
     -cm_dir "${cov_dir}" \
-    -cm_name "${safe_test_name}" \
+    -cm_name "${cov_name}" \
     2>&1 | tee "${sim_log}"
 else
   "${build_dir}/simv" "${sim_args[@]}" 2>&1 | tee "${sim_log}"
@@ -516,6 +518,11 @@ set -e
 if (( sim_status != 0 )); then
   echo "ERROR: simv exited with status ${sim_status}; see ${sim_log}" >&2
   exit "${sim_status}"
+fi
+
+if grep -Eiq '^[[:space:]]*(error|fatal)(:|-\[)' "${sim_log}"; then
+  echo "ERROR: simulator or assertion errors were reported; see ${sim_log}" >&2
+  exit 7
 fi
 
 if ! grep -Fq "Running test ${test_name}" "${sim_log}"; then
@@ -537,6 +544,12 @@ fi
 if ! grep -Eq '^[[:space:]]*UVM_FATAL[[:space:]]*:[[:space:]]*0([[:space:]]|$)' "${sim_log}"; then
   echo "ERROR: the UVM report does not show UVM_FATAL : 0." >&2
   exit 6
+fi
+
+if [[ "${test_name}" == "dma_subsys_random_stress_test" ]] &&
+   ! grep -Fq '[STRESS_SUMMARY]' "${sim_log}"; then
+  echo "ERROR: random stress completion evidence is missing; see ${sim_log}" >&2
+  exit 4
 fi
 
 echo "PASS: ${test_name} ran to completion with UVM_ERROR=0 and UVM_FATAL=0."

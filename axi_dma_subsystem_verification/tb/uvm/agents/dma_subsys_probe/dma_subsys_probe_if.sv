@@ -1,9 +1,15 @@
+`timescale 1ns / 1ps
 `default_nettype none
 
 interface dma_subsys_probe_if (
     input logic clk
 );
     import dma_subsystem_pkg::*;
+    import dma_subsys_irq_model_pkg::*;
+
+    dma_irq_bus_sample_t irq_bus;
+    dma_irq_input_sample_t irq_inputs;
+    dma_irq_observed_t irq_observed;
 
     logic reset_n;
 
@@ -46,6 +52,7 @@ interface dma_subsys_probe_if (
     clocking mon_cb @(posedge clk);
         default input #1step;
         input reset_n;
+        input irq_bus, irq_inputs, irq_observed;
         input cmd_valid, cmd_ready, cmd_payload, accepted_hw_tag;
         input route_req_valid, route_req_src, route_req_dst;
         input route_req_ready, route_dest, route_release;
