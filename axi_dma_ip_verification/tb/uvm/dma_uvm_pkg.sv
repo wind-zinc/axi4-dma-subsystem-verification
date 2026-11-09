@@ -38,8 +38,6 @@ package dma_uvm_pkg;
     `include "dma_sub_beat_tag_seq.sv"
     `include "dma_alignment_reject_seq.sv"
     `include "dma_access_policy_seq.sv"
-
-    /* Stage-5 coverage-convergence sequences. */
     `include "dma_mem_ral_base_seq.sv"
     `include "dma_error_response_seq.sv"
     `include "dma_queue_mid_level_seq.sv"
@@ -49,18 +47,11 @@ package dma_uvm_pkg;
     `include "dma_command_noop_seq.sv"
     `include "dma_address_range_reject_seq.sv"
     `include "dma_ro_write_protection_seq.sv"
-
-    /* Stage-7 reset, outstanding, and overlap-policy sequences. */
     `include "dma_overlap_reject_seq.sv"
     `include "dma_reset_recovery_seq.sv"
     `include "dma_outstanding_seq.sv"
-
-    /* Stage-8 axi_dma_wr code-coverage sequence. */
     `include "dma_write_engine_corner_seq.sv"
-
-    /* Stage-10 assertion activation and toggle-closure sequence. */
     `include "dma_sva_activation_seq.sv"
-
     `include "dma_ref_model.sv"
     `include "dma_observer_monitor.sv"
     `include "dma_outstanding_monitor.sv"
@@ -80,8 +71,6 @@ package dma_uvm_pkg;
     `include "dma_sub_beat_tag_test.sv"
     `include "dma_alignment_reject_test.sv"
     `include "dma_access_policy_test.sv"
-
-    /* Stage-5 coverage-convergence tests. */
     `include "dma_mem_test_base.sv"
     `include "dma_error_response_test.sv"
     `include "dma_queue_mid_level_test.sv"
@@ -91,16 +80,10 @@ package dma_uvm_pkg;
     `include "dma_command_noop_test.sv"
     `include "dma_address_range_reject_test.sv"
     `include "dma_ro_write_protection_test.sv"
-
-    /* Stage-7 closure tests. */
     `include "dma_overlap_reject_test.sv"
     `include "dma_reset_recovery_test.sv"
     `include "dma_outstanding_test.sv"
-
-    /* Stage-8 axi_dma_wr code-coverage test. */
     `include "dma_write_engine_corner_test.sv"
-
-    /* Stage-10 assertion activation and toggle-closure test. */
     `include "dma_sva_activation_test.sv"
 
 endpackage
